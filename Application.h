@@ -30,10 +30,14 @@ namespace Haus {
     private:
         void InitVulkan();
         void CreateInstance();
+        void PickPhysicalDevice();
+        void CreateLogicalDevice();
 
         void CleanupVulkan();
 
         vk::Instance m_Instance;
+        vk::PhysicalDevice m_PhysicalDevice;
+        vk::Device m_Device;
     };
 
 } // Haus
