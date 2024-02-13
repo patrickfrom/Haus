@@ -42,6 +42,7 @@ namespace Haus {
         void PickPhysicalDevice();
         void CreateLogicalDevice();
         void CreateSwapchain();
+        void CreateImageViews();
 
         void CleanupVulkan();
 
@@ -52,6 +53,7 @@ namespace Haus {
         vk::SurfaceKHR m_Surface;
         vk::SwapchainKHR m_Swapchain;
         std::vector<vk::Image> m_SwapchainImages;
+        std::vector<vk::ImageView> m_SwapchainImageViews;
         vk::Format m_SwapchainImageFormat;
         vk::Extent2D m_SwapchainExtent;
 

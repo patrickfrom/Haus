@@ -64,6 +64,7 @@ namespace Haus {
         PickPhysicalDevice();
         CreateLogicalDevice();
         CreateSwapchain();
+        CreateImageViews();
     }
 
     void Application::CreateInstance() {
@@ -191,7 +192,38 @@ namespace Haus {
         m_SwapchainExtent = extent;
     }
 
+    void Application::CreateImageViews() {
+        m_SwapchainImageViews.resize(m_SwapchainImages.size());
+
+        for (size_t i = 0; i < m_SwapchainImages.size(); i++) {
+            vk::ImageViewCreateInfo createInfo {
+                .image = m_SwapchainImages[i],
+                .viewType = vk::ImageViewType::e2D,
+                .format = m_SwapchainImageFormat,
+                .components {
+                    .r = vk::ComponentSwizzle::eIdentity,
+                    .g = vk::ComponentSwizzle::eIdentity,
+                    .b = vk::ComponentSwizzle::eIdentity,
+                    .a = vk::ComponentSwizzle::eIdentity,
+                },
+                .subresourceRange {
+                    .aspectMask = vk::ImageAspectFlagBits::eColor,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+
+            if (m_Device.createImageView(&createInfo, nullptr, &m_SwapchainImageViews[i]) != vk::Result::eSuccess)
+                throw std::runtime_error("Failed to create image views!");
+        }
+    }
+
     void Application::CleanupVulkan() {
+        for (auto imageView : m_SwapchainImageViews)
+            m_Device.destroyImageView(imageView);
+
         m_Device.destroySwapchainKHR(m_Swapchain);
         m_Device.destroy();
         m_Instance.destroySurfaceKHR(m_Surface);
