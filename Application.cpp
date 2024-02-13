@@ -66,6 +66,7 @@ namespace Haus {
         CreateLogicalDevice();
         CreateSwapchain();
         CreateImageViews();
+        CreateRenderPass();
         CreateGraphicsPipeline();
     }
 
@@ -220,6 +221,32 @@ namespace Haus {
             if (m_Device.createImageView(&createInfo, nullptr, &m_SwapchainImageViews[i]) != vk::Result::eSuccess)
                 throw std::runtime_error("Failed to create image views!");
         }
+    }
+
+    void Application::CreateRenderPass() {
+        vk::AttachmentDescription colorAttachment {
+            .format = m_SwapchainImageFormat,
+            .samples = vk::SampleCountFlagBits::e1,
+            .loadOp = vk::AttachmentLoadOp::eClear,
+            .storeOp = vk::AttachmentStoreOp::eStore,
+            .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+            .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+            .initialLayout = vk::ImageLayout::eUndefined,
+            .finalLayout = vk::ImageLayout::ePresentSrcKHR
+        };
+
+        vk::AttachmentReference colorAttachmentReference {
+            .attachment = 0,
+            .layout = vk::ImageLayout::eColorAttachmentOptimal
+        };
+
+        vk::SubpassDescription subpass{
+            .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
+            .colorAttachmentCount = 1,
+            .pColorAttachments = &colorAttachmentReference,
+        };
+
+        // https://docs.vulkan.org/tutorial/latest/03_Drawing_a_triangle/02_Graphics_pipeline_basics/03_Render_passes.html#_render_pass
     }
 
     static std::vector<char> ReadFile(const std::string &filename) {
