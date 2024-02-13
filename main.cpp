@@ -2,18 +2,43 @@
 
 #define VULKAN_HPP_NO_CONSTRUCTORS
 
-#include <vulkan/vulkan.hpp>
-#include <GLFW/glfw3.h>
-#include <set>
+//#include <vulkan/vulkan.hpp>
+//#include <GLFW/glfw3.h>
+//#include <set>
 
-GLFWwindow *m_Window;
+#include "Application.h"
 
+int main() {
+    Haus::ApplicationSpecification specification{
+            .Name = "Haus",
+            .Width = 800,
+            .Height = 600,
+    };
+
+    Haus::Application app{specification};
+
+    try {
+        app.Run();
+    } catch (std::exception &exception) {
+        std::cerr << exception.what() << std::endl;
+    }
+
+    app.Shutdown();
+    return 0;
+}
+
+/*
 vk::Instance m_Instance;
 vk::PhysicalDevice m_PhysicalDevice;
 vk::Device m_Device;
 vk::SurfaceKHR m_Surface;
 vk::Queue m_GraphicsQueue;
 vk::Queue m_PresentQueue;
+vk::SwapchainKHR m_Swapchain;
+
+struct Vertex {
+    glm::vec2 position;
+};
 
 void Run();
 
@@ -33,6 +58,12 @@ void PickPhysicalDevice();
 
 void CreateLogicalDevice();
 
+void CreateSwapChain();
+
+void CreateGraphicsPipeline();
+
+vk::ShaderModule CreateShaderModule(const std::vector<char> &code);
+
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;
     std::optional<uint32_t> presentFamily;
@@ -42,30 +73,9 @@ struct QueueFamilyIndices {
     }
 };
 
-int main() {
-    try {
-        Run();
-    } catch (const std::exception &exception) {
-        std::cerr << exception.what() << std::endl;
-    }
-
-    Cleanup();
-    return 0;
-}
-
 void Run() {
-    InitWindow();
     InitVulkan();
     Loop();
-}
-
-void InitWindow() {
-    glfwInit();
-
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
-    m_Window = glfwCreateWindow(800, 600, "Haus", nullptr, nullptr);
 }
 
 void InitVulkan() {
@@ -73,6 +83,9 @@ void InitVulkan() {
     CreateSurface();
     PickPhysicalDevice();
     CreateLogicalDevice();
+    CreateSwapChain();
+
+    CreateGraphicsPipeline();
 }
 
 void Loop() {
@@ -82,6 +95,7 @@ void Loop() {
 }
 
 void Cleanup() {
+    m_Device.destroySwapchainKHR(m_Swapchain);
     m_Device.destroy();
     m_Instance.destroySurfaceKHR(m_Surface, nullptr);
     m_Instance.destroy();
@@ -120,7 +134,7 @@ void CreateInstance() {
 void CreateSurface() {
     // Here we create our surface between GLFW
     auto surfaceKHR = static_cast<VkSurfaceKHR>(m_Surface);
-    if (static_cast<vk::Result>(glfwCreateWindowSurface(VkInstance(m_Instance), m_Window, nullptr, &surfaceKHR)) !=
+    if (static_cast<vk::Result>(glfwCreateWindowSurface(m_Instance, m_Window, nullptr, &surfaceKHR)) !=
         vk::Result::eSuccess)
         throw std::runtime_error("Failed to create Window Surface");
 
@@ -144,7 +158,7 @@ QueueFamilyIndices FindQueueFamilies(vk::PhysicalDevice device) {
     std::vector<vk::QueueFamilyProperties> queueFamilies = device.getQueueFamilyProperties();
 
     int i = 0;
-    for (const auto& queueFamily : queueFamilies) {
+    for (const auto &queueFamily: queueFamilies) {
         if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics)
             indices.graphicsFamily = i;
 
@@ -171,26 +185,26 @@ void CreateLogicalDevice() {
     };
 
     const float priority = 1.0f;
-    for (uint32_t queueFamily : uniqueQueueFamilies) {
+    for (uint32_t queueFamily: uniqueQueueFamilies) {
         vk::DeviceQueueCreateInfo queueCreateInfo{
-            .queueFamilyIndex = queueFamily,
-            .queueCount = 1,
-            .pQueuePriorities = &priority,
+                .queueFamilyIndex = queueFamily,
+                .queueCount = 1,
+                .pQueuePriorities = &priority,
         };
 
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
-    std::vector<const char*> enabledExtensions = { "VK_KHR_swapchain" };
+    std::vector<const char *> enabledExtensions = {"VK_KHR_swapchain"};
 
     vk::PhysicalDeviceFeatures deviceFeatures{};
 
     vk::DeviceCreateInfo createInfo{
-        .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
-        .pQueueCreateInfos = queueCreateInfos.data(),
-        .enabledExtensionCount = static_cast<uint32_t>(enabledExtensions.size()),
-        .ppEnabledExtensionNames = enabledExtensions.data(),
-        .pEnabledFeatures = &deviceFeatures
+            .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
+            .pQueueCreateInfos = queueCreateInfos.data(),
+            .enabledExtensionCount = static_cast<uint32_t>(enabledExtensions.size()),
+            .ppEnabledExtensionNames = enabledExtensions.data(),
+            .pEnabledFeatures = &deviceFeatures
     };
 
     m_Device = m_PhysicalDevice.createDevice(createInfo, nullptr);
@@ -200,3 +214,94 @@ void CreateLogicalDevice() {
     m_GraphicsQueue = m_Device.getQueue(indices.graphicsFamily.value(), 0);
     m_PresentQueue = m_Device.getQueue(indices.presentFamily.value(), 0);
 }
+
+void CreateSwapChain() {
+    vk::SwapchainCreateInfoKHR createInfo {
+        .surface = m_Surface,
+        .minImageCount = 4,
+        .imageFormat = vk::Format::eB8G8R8A8Srgb,
+        .imageColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear,
+        .imageExtent = vk::Extent2D(800, 600),
+        .imageArrayLayers = 1,
+        .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
+        .presentMode = vk::PresentModeKHR::eMailbox
+
+    };
+
+    m_Swapchain = m_Device.createSwapchainKHR(createInfo);
+}
+
+void CreateGraphicsPipeline() {
+    std::vector<char> aa;
+    vk::ShaderModule vertexShaderModule = CreateShaderModule(aa);
+    vk::ShaderModule fragmentShaderModule = CreateShaderModule(aa);
+
+    vk::PipelineShaderStageCreateInfo vertexShaderStageInfo{
+            .stage = vk::ShaderStageFlagBits::eVertex,
+            .module = vertexShaderModule,
+            .pName = "main"
+    };
+
+    vk::PipelineShaderStageCreateInfo fragmentShaderStageInfo{
+            .stage = vk::ShaderStageFlagBits::eFragment,
+            .module = fragmentShaderModule,
+            .pName = "main"
+    };
+
+    vk::PipelineShaderStageCreateInfo shaderStages[] = {
+            vertexShaderStageInfo,
+            fragmentShaderStageInfo
+    };
+
+    std::array<vk::DynamicState, 2> dynamicStates = {
+            vk::DynamicState::eViewport,
+            vk::DynamicState::eScissor
+    };
+
+    vk::PipelineDynamicStateCreateInfo dynamicState{
+            .dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
+            .pDynamicStates = dynamicStates.data()
+    };
+
+    vk::VertexInputBindingDescription vertexInputBindingDescription{
+        .binding = 0,
+        .stride = sizeof(Vertex),
+        .inputRate = vk::VertexInputRate::eVertex
+    };
+
+    vk::VertexInputAttributeDescription vertexInputAttributeDescription{
+        .location = 0,
+        .binding = 0,
+        .format = vk::Format::eR32G32Sfloat,
+        .offset = offsetof(Vertex, position)
+    };
+
+    vk::PipelineVertexInputStateCreateInfo vertexInputState{
+        .vertexBindingDescriptionCount = 1,
+        .pVertexBindingDescriptions = &vertexInputBindingDescription,
+        .vertexAttributeDescriptionCount = 1,
+        .pVertexAttributeDescriptions = &vertexInputAttributeDescription
+    };
+
+
+    vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo{
+            .pVertexInputState = &vertexInputState,
+            .pDynamicState = &dynamicState,
+    };
+
+    m_Device.destroyShaderModule(vertexShaderModule, nullptr);
+    m_Device.destroyShaderModule(fragmentShaderModule, nullptr);
+}
+
+vk::ShaderModule CreateShaderModule(const std::vector<char> &code) {
+    vk::ShaderModuleCreateInfo createInfo{
+            .codeSize = code.size(),
+            .pCode = reinterpret_cast<const uint32_t *>(code.data()),
+    };
+
+    vk::ShaderModule shaderModule = m_Device.createShaderModule(createInfo, nullptr);
+    if (!shaderModule)
+        throw std::runtime_error("Failed to create shader module!");
+
+    return shaderModule;
+}*/
