@@ -1,6 +1,7 @@
 #include "Application.h"
 #include <iostream>
 #include <format>
+#include <fstream>
 
 /* Currently using regions, just so it's easier for me to
    see what's going on since I don't want to abstract
@@ -65,6 +66,7 @@ namespace Haus {
         CreateLogicalDevice();
         CreateSwapchain();
         CreateImageViews();
+        CreateGraphicsPipeline();
     }
 
     void Application::CreateInstance() {
@@ -150,10 +152,10 @@ namespace Haus {
     }
 
     SwapChainSupportDetails Application::QuerySwapChainSupport(vk::PhysicalDevice device) {
-        SwapChainSupportDetails details {
-            .Capabilities = device.getSurfaceCapabilitiesKHR(m_Surface),
-            .Formats = device.getSurfaceFormatsKHR(m_Surface),
-            .PresentModes = device.getSurfacePresentModesKHR(m_Surface)
+        SwapChainSupportDetails details{
+                .Capabilities = device.getSurfaceCapabilitiesKHR(m_Surface),
+                .Formats = device.getSurfaceFormatsKHR(m_Surface),
+                .PresentModes = device.getSurfacePresentModesKHR(m_Surface)
         };
 
         return details;
@@ -196,23 +198,23 @@ namespace Haus {
         m_SwapchainImageViews.resize(m_SwapchainImages.size());
 
         for (size_t i = 0; i < m_SwapchainImages.size(); i++) {
-            vk::ImageViewCreateInfo createInfo {
-                .image = m_SwapchainImages[i],
-                .viewType = vk::ImageViewType::e2D,
-                .format = m_SwapchainImageFormat,
-                .components {
-                    .r = vk::ComponentSwizzle::eIdentity,
-                    .g = vk::ComponentSwizzle::eIdentity,
-                    .b = vk::ComponentSwizzle::eIdentity,
-                    .a = vk::ComponentSwizzle::eIdentity,
-                },
-                .subresourceRange {
-                    .aspectMask = vk::ImageAspectFlagBits::eColor,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
-                }
+            vk::ImageViewCreateInfo createInfo{
+                    .image = m_SwapchainImages[i],
+                    .viewType = vk::ImageViewType::e2D,
+                    .format = m_SwapchainImageFormat,
+                    .components {
+                            .r = vk::ComponentSwizzle::eIdentity,
+                            .g = vk::ComponentSwizzle::eIdentity,
+                            .b = vk::ComponentSwizzle::eIdentity,
+                            .a = vk::ComponentSwizzle::eIdentity,
+                    },
+                    .subresourceRange {
+                            .aspectMask = vk::ImageAspectFlagBits::eColor,
+                            .baseMipLevel = 0,
+                            .levelCount = 1,
+                            .baseArrayLayer = 0,
+                            .layerCount = 1
+                    }
             };
 
             if (m_Device.createImageView(&createInfo, nullptr, &m_SwapchainImageViews[i]) != vk::Result::eSuccess)
@@ -220,8 +222,140 @@ namespace Haus {
         }
     }
 
+    static std::vector<char> ReadFile(const std::string &filename) {
+        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+        if (!file.is_open())
+            throw std::runtime_error("Failed to open file");
+
+        size_t fileSize = (size_t) file.tellg();
+        std::vector<char> buffer(fileSize);
+        file.seekg(0);
+        file.read(buffer.data(), fileSize);
+        file.close();
+
+        return buffer;
+    }
+
+    vk::ShaderModule Application::CreateShaderModule(const std::vector<char> &code) {
+        vk::ShaderModuleCreateInfo createInfo{
+                .codeSize = code.size(),
+                .pCode = reinterpret_cast<const uint32_t *>(code.data())
+        };
+
+        vk::ShaderModule shaderModule;
+        if (m_Device.createShaderModule(&createInfo, nullptr, &shaderModule) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to create shader module!");
+
+        return shaderModule;
+    }
+
+    void Application::CreateGraphicsPipeline() {
+        auto vertexShaderCode = ReadFile("shaders/vert.spv");
+        auto fragmentShaderCode = ReadFile("shaders/frag.spv");
+
+        vk::ShaderModule vertexShaderModule = CreateShaderModule(vertexShaderCode);
+        vk::ShaderModule fragmentShaderModule = CreateShaderModule(fragmentShaderCode);
+
+        vk::PipelineShaderStageCreateInfo vertexShaderStageInfo{
+                .stage = vk::ShaderStageFlagBits::eVertex,
+                .module = vertexShaderModule,
+                .pName = "main"
+        };
+
+        vk::PipelineShaderStageCreateInfo fragmentShaderStageInfo{
+                .stage = vk::ShaderStageFlagBits::eFragment,
+                .module = fragmentShaderModule,
+                .pName = "main"
+        };
+
+        std::array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = {
+                vertexShaderStageInfo,
+                fragmentShaderStageInfo
+        };
+
+        std::array<vk::DynamicState, 2> dynamicStates = {
+                vk::DynamicState::eViewport,
+                vk::DynamicState::eScissor
+        };
+
+        vk::PipelineDynamicStateCreateInfo dynamicState{
+                .dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
+                .pDynamicStates = dynamicStates.data()
+        };
+
+        vk::PipelineVertexInputStateCreateInfo vertexInputInfo{
+                .vertexBindingDescriptionCount = 0,
+                .vertexAttributeDescriptionCount = 0,
+        };
+
+        vk::PipelineInputAssemblyStateCreateInfo inputAssembly{
+                .topology = vk::PrimitiveTopology::eTriangleList,
+                .primitiveRestartEnable = VK_FALSE
+        };
+
+        vk::Viewport viewport{
+                .x = 0.0f,
+                .y = 0.0f,
+                .width = (float) m_SwapchainExtent.width,
+                .height = (float) m_SwapchainExtent.height,
+                .minDepth = 0.0f,
+                .maxDepth = 1.0f,
+        };
+
+        vk::Rect2D scissor{
+                .offset = {0, 0},
+                .extent = m_SwapchainExtent
+        };
+
+        vk::PipelineViewportStateCreateInfo viewportState{
+                .viewportCount = 1,
+                .pViewports = &viewport,
+                .scissorCount = 1,
+                .pScissors = &scissor
+        };
+
+        vk::PipelineRasterizationStateCreateInfo rasterizer{
+                .depthClampEnable = VK_FALSE,
+                .rasterizerDiscardEnable = VK_FALSE,
+                .polygonMode = vk::PolygonMode::eFill,
+                .cullMode = vk::CullModeFlagBits::eBack,
+                .frontFace = vk::FrontFace::eClockwise,
+                .depthBiasEnable = VK_FALSE,
+                .lineWidth = 1.0f,
+        };
+
+        vk::PipelineMultisampleStateCreateInfo multisampling{
+                .rasterizationSamples = vk::SampleCountFlagBits::e1,
+                .sampleShadingEnable = VK_FALSE,
+        };
+
+        vk::PipelineColorBlendAttachmentState colorBlendAttachment{
+                .blendEnable = VK_FALSE,
+                .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
+                                  | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
+        };
+
+        vk::PipelineColorBlendStateCreateInfo colorBlending{
+                .logicOpEnable = VK_FALSE,
+                .logicOp = vk::LogicOp::eCopy,
+                .attachmentCount = 1,
+                .pAttachments = &colorBlendAttachment
+        };
+
+        vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
+
+        if (m_Device.createPipelineLayout(&pipelineLayoutInfo, nullptr, &m_PipelineLayout) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to create pipeline layout!");
+
+        m_Device.destroyShaderModule(vertexShaderModule);
+        m_Device.destroyShaderModule(fragmentShaderModule);
+    }
+
     void Application::CleanupVulkan() {
-        for (auto imageView : m_SwapchainImageViews)
+        m_Device.destroyPipelineLayout(m_PipelineLayout);
+
+        for (auto imageView: m_SwapchainImageViews)
             m_Device.destroyImageView(imageView);
 
         m_Device.destroySwapchainKHR(m_Swapchain);

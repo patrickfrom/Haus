@@ -35,6 +35,7 @@ namespace Haus {
         GLFWwindow* m_Window;
     private:
         SwapChainSupportDetails QuerySwapChainSupport(vk::PhysicalDevice device);
+        vk::ShaderModule CreateShaderModule(const std::vector<char>& code);
 
         void InitVulkan();
         void CreateInstance();
@@ -43,6 +44,7 @@ namespace Haus {
         void CreateLogicalDevice();
         void CreateSwapchain();
         void CreateImageViews();
+        void CreateGraphicsPipeline();
 
         void CleanupVulkan();
 
@@ -56,6 +58,7 @@ namespace Haus {
         std::vector<vk::ImageView> m_SwapchainImageViews;
         vk::Format m_SwapchainImageFormat;
         vk::Extent2D m_SwapchainExtent;
+        vk::PipelineLayout m_PipelineLayout;
 
         vk::Queue m_GraphicsQueue;
     };
