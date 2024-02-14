@@ -59,7 +59,10 @@ namespace Haus {
         std::vector<vk::ImageView> m_SwapchainImageViews;
         vk::Format m_SwapchainImageFormat;
         vk::Extent2D m_SwapchainExtent;
+        vk::RenderPass m_RenderPass;
         vk::PipelineLayout m_PipelineLayout;
+        vk::Pipeline m_GraphicsPipeline;
+        std::vector<vk::Framebuffer> m_SwapchainFramebuffers;
 
         vk::Queue m_GraphicsQueue;
     };

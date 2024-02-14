@@ -246,7 +246,15 @@ namespace Haus {
             .pColorAttachments = &colorAttachmentReference,
         };
 
-        // https://docs.vulkan.org/tutorial/latest/03_Drawing_a_triangle/02_Graphics_pipeline_basics/03_Render_passes.html#_render_pass
+        vk::RenderPassCreateInfo renderPassInfo {
+            .attachmentCount = 1,
+            .pAttachments = &colorAttachment,
+            .subpassCount = 1,
+            .pSubpasses = &subpass
+        };
+
+        if (m_Device.createRenderPass(&renderPassInfo, nullptr, &m_RenderPass) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to create render pass");
     }
 
     static std::vector<char> ReadFile(const std::string &filename) {
@@ -278,8 +286,8 @@ namespace Haus {
     }
 
     void Application::CreateGraphicsPipeline() {
-        auto vertexShaderCode = ReadFile("shaders/vert.spv");
-        auto fragmentShaderCode = ReadFile("shaders/frag.spv");
+        auto vertexShaderCode = ReadFile("vert.spv");
+        auto fragmentShaderCode = ReadFile("frag.spv");
 
         vk::ShaderModule vertexShaderModule = CreateShaderModule(vertexShaderCode);
         vk::ShaderModule fragmentShaderModule = CreateShaderModule(fragmentShaderCode);
@@ -375,12 +383,38 @@ namespace Haus {
         if (m_Device.createPipelineLayout(&pipelineLayoutInfo, nullptr, &m_PipelineLayout) != vk::Result::eSuccess)
             throw std::runtime_error("Failed to create pipeline layout!");
 
+        vk::GraphicsPipelineCreateInfo pipelineInfo {
+            .stageCount = static_cast<uint32_t>(shaderStages.size()),
+            .pStages = shaderStages.data(),
+            .pVertexInputState = &vertexInputInfo,
+            .pInputAssemblyState = &inputAssembly,
+            .pViewportState = &viewportState,
+            .pRasterizationState = &rasterizer,
+            .pMultisampleState = &multisampling,
+            .pColorBlendState = &colorBlending,
+            .pDynamicState = &dynamicState,
+            .layout = m_PipelineLayout,
+            .renderPass = m_RenderPass,
+            .subpass = 0,
+
+            // Vulkan allows you to create a new graphics pipeline by deriving from an existing pipeline.
+            // The idea of pipeline derivatives is that it is less expensive to set up pipelines when they have much functionality
+            // in common with an existing pipeline and switching between pipelines from the same parent can also be done quicker.
+            .basePipelineHandle = VK_NULL_HANDLE,
+            .basePipelineIndex = -1
+        };
+
+        if (m_Device.createGraphicsPipelines(VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_GraphicsPipeline) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to create Graphics Pipeline");
+
         m_Device.destroyShaderModule(vertexShaderModule);
         m_Device.destroyShaderModule(fragmentShaderModule);
     }
 
     void Application::CleanupVulkan() {
+        m_Device.destroyPipeline(m_GraphicsPipeline);
         m_Device.destroyPipelineLayout(m_PipelineLayout);
+        m_Device.destroyRenderPass(m_RenderPass);
 
         for (auto imageView: m_SwapchainImageViews)
             m_Device.destroyImageView(imageView);
