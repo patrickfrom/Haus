@@ -44,12 +44,20 @@ namespace Haus {
             throw std::runtime_error("Failed to Initialize GLFW");
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
         m_Window = glfwCreateWindow(m_Specification.Width, m_Specification.Height, m_Specification.Name.c_str(),
                                     nullptr, nullptr);
         if (!m_Window)
             throw std::runtime_error("Failed to create GLFW Window");
+
+        glfwSetWindowUserPointer(m_Window, this);
+        glfwSetFramebufferSizeCallback(m_Window, FramebufferResizeCallback);
+    }
+
+    void Application::FramebufferResizeCallback(GLFWwindow *window, int width, int height) {
+        auto app = reinterpret_cast<Application *>(glfwGetWindowUserPointer(window));
+
+        app->m_FramebufferResized = true;
     }
 
     void Application::CleanupGLFW() {
@@ -73,7 +81,7 @@ namespace Haus {
         CreateGraphicsPipeline();
         CreateFramebuffers();
         CreateCommandPool();
-        CreateCommandBuffer();
+        CreateCommandBuffers();
         CreateSyncObjects();
     }
 
@@ -183,9 +191,13 @@ namespace Haus {
                 .height = static_cast<uint32_t>(height)
         };
 
+        uint32_t imageCount = swapChainSupport.Capabilities.minImageCount + 1;
+        if (swapChainSupport.Capabilities.maxImageCount > 0 && imageCount > swapChainSupport.Capabilities.maxImageCount)
+            imageCount = swapChainSupport.Capabilities.maxImageCount;
+
         vk::SwapchainCreateInfoKHR createInfo{
                 .surface = m_Surface,
-                .minImageCount = 4,
+                .minImageCount = imageCount,
                 .imageFormat = swapChainSupport.Formats[0].format,
                 .imageColorSpace = swapChainSupport.Formats[0].colorSpace,
                 .imageExtent = extent,
@@ -194,7 +206,7 @@ namespace Haus {
                 .imageSharingMode = vk::SharingMode::eExclusive,
                 .preTransform = swapChainSupport.Capabilities.currentTransform,
                 .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
-                .presentMode = vk::PresentModeKHR::eFifo,
+                .presentMode = vk::PresentModeKHR::eMailbox,
                 .clipped = VK_TRUE,
         };
 
@@ -205,6 +217,32 @@ namespace Haus {
 
         m_SwapchainImageFormat = swapChainSupport.Formats[0].format;
         m_SwapchainExtent = extent;
+    }
+
+    void Application::CleanupSwapchain() {
+        for (auto framebuffer: m_SwapchainFramebuffers)
+            m_Device.destroyFramebuffer(framebuffer);
+
+        for (auto imageView: m_SwapchainImageViews)
+            m_Device.destroyImageView(imageView);
+
+        m_Device.destroySwapchainKHR(m_Swapchain);
+    }
+
+    void Application::RecreateSwapchain() {
+        int width = 0, height = 0;
+        glfwGetFramebufferSize(m_Window, &width, &height);
+        while (width == 0 || height == 0) {
+            glfwGetFramebufferSize(m_Window, &width, &height);
+            glfwWaitEvents();
+        }
+        m_Device.waitIdle();
+
+        CleanupSwapchain();
+
+        CreateSwapchain();
+        CreateImageViews();
+        CreateFramebuffers();
     }
 
     void Application::CreateImageViews() {
@@ -259,12 +297,12 @@ namespace Haus {
         };
 
         vk::SubpassDependency dependency{
-            .srcSubpass = VK_SUBPASS_EXTERNAL,
-            .dstSubpass = 0,
-            .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-            .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-            .srcAccessMask = vk::AccessFlagBits::eNone,
-            .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite
+                .srcSubpass = VK_SUBPASS_EXTERNAL,
+                .dstSubpass = 0,
+                .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                .srcAccessMask = vk::AccessFlagBits::eNone,
+                .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite
         };
 
         vk::RenderPassCreateInfo renderPassInfo{
@@ -452,27 +490,37 @@ namespace Haus {
             throw std::runtime_error("Failed to create command pool");
     }
 
-    void Application::CreateCommandBuffer() {
+    void Application::CreateCommandBuffers() {
+        m_CommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+
         vk::CommandBufferAllocateInfo allocateInfo{
                 .commandPool = m_CommandPool,
                 .level = vk::CommandBufferLevel::ePrimary,
-                .commandBufferCount = 1
+                .commandBufferCount = (uint32_t) m_CommandBuffers.size()
         };
 
-        if (m_Device.allocateCommandBuffers(&allocateInfo, &m_CommandBuffer) != vk::Result::eSuccess)
+        if (m_Device.allocateCommandBuffers(&allocateInfo, m_CommandBuffers.data()) != vk::Result::eSuccess)
             throw std::runtime_error("Failed to allocate command buffers");
     }
 
     void Application::CreateSyncObjects() {
+        m_ImageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+        m_RenderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+        m_InFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
         vk::SemaphoreCreateInfo semaphoreInfo{};
         vk::FenceCreateInfo fenceInfo{
-            .flags = vk::FenceCreateFlagBits::eSignaled
+                .flags = vk::FenceCreateFlagBits::eSignaled
         };
 
-        if (m_Device.createSemaphore(&semaphoreInfo, nullptr, &m_ImageAvailableSemaphore) != vk::Result::eSuccess ||
-            m_Device.createSemaphore(&semaphoreInfo, nullptr, &m_RenderFinishedSemaphore) != vk::Result::eSuccess ||
-            m_Device.createFence(&fenceInfo, nullptr, &m_InFlightFence) != vk::Result::eSuccess)
-            throw std::runtime_error("Failed to create Semaphores!");
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            if (m_Device.createSemaphore(&semaphoreInfo, nullptr, &m_ImageAvailableSemaphores[i]) !=
+                vk::Result::eSuccess ||
+                m_Device.createSemaphore(&semaphoreInfo, nullptr, &m_RenderFinishedSemaphores[i]) !=
+                vk::Result::eSuccess ||
+                m_Device.createFence(&fenceInfo, nullptr, &m_InFlightFences[i]) != vk::Result::eSuccess)
+                throw std::runtime_error("Failed to create Semaphores!");
+        }
     }
 
     void Application::RecordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex) {
@@ -521,63 +569,76 @@ namespace Haus {
     }
 
     void Application::DrawFrame() {
-        while (vk::Result::eTimeout == m_Device.waitForFences(1, &m_InFlightFence, VK_TRUE, UINT64_MAX));
-        m_Device.resetFences(1, &m_InFlightFence);
+        m_Device.waitForFences(1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
 
         uint32_t imageIndex;
-        m_Device.acquireNextImageKHR(m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+        vk::Result result = m_Device.acquireNextImageKHR(m_Swapchain, UINT64_MAX,
+                                                         m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE,
+                                                         &imageIndex);
 
-        m_CommandBuffer.reset();
-        RecordCommandBuffer(m_CommandBuffer, imageIndex);
+        if (result == vk::Result::eErrorOutOfDateKHR) {
+            RecreateSwapchain();
+            return;
+        } else if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
+            throw std::runtime_error("Failed to acquire swap chain image");
+
+        m_Device.resetFences(1, &m_InFlightFences[m_CurrentFrame]);
+
+        m_CommandBuffers[m_CurrentFrame].reset();
+        RecordCommandBuffer(m_CommandBuffers[m_CurrentFrame], imageIndex);
 
 
-        vk::Semaphore waitSemaphores[] = {m_ImageAvailableSemaphore};
-        vk::Semaphore signalSemaphores[] = {m_RenderFinishedSemaphore};
+        vk::Semaphore waitSemaphores[] = {m_ImageAvailableSemaphores[m_CurrentFrame]};
+        vk::Semaphore signalSemaphores[] = {m_RenderFinishedSemaphores[m_CurrentFrame]};
         vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
         vk::SubmitInfo submitInfo{
-            .waitSemaphoreCount = 1,
-            .pWaitSemaphores = waitSemaphores,
-            .pWaitDstStageMask = waitStages,
-            .commandBufferCount = 1,
-            .pCommandBuffers = &m_CommandBuffer,
-            .signalSemaphoreCount = 1,
-            .pSignalSemaphores = signalSemaphores,
+                .waitSemaphoreCount = 1,
+                .pWaitSemaphores = waitSemaphores,
+                .pWaitDstStageMask = waitStages,
+                .commandBufferCount = 1,
+                .pCommandBuffers = &m_CommandBuffers[m_CurrentFrame],
+                .signalSemaphoreCount = 1,
+                .pSignalSemaphores = signalSemaphores,
         };
 
-        if (m_GraphicsQueue.submit(1, &submitInfo, m_InFlightFence) != vk::Result::eSuccess)
+        if (m_GraphicsQueue.submit(1, &submitInfo, m_InFlightFences[m_CurrentFrame]) != vk::Result::eSuccess)
             throw std::runtime_error("Failed to submit draw command buffer");
 
         vk::SwapchainKHR swapchains[] = {m_Swapchain};
 
         vk::PresentInfoKHR presentInfo{
-            .waitSemaphoreCount = 1,
-            .pWaitSemaphores = signalSemaphores,
-            .swapchainCount = 1,
-            .pSwapchains = swapchains,
-            .pImageIndices = &imageIndex
+                .waitSemaphoreCount = 1,
+                .pWaitSemaphores = signalSemaphores,
+                .swapchainCount = 1,
+                .pSwapchains = swapchains,
+                .pImageIndices = &imageIndex
         };
 
-        m_GraphicsQueue.presentKHR(&presentInfo);
+        result = m_GraphicsQueue.presentKHR(&presentInfo);
+        if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || m_FramebufferResized) {
+            m_FramebufferResized = false;
+            RecreateSwapchain();
+        } else if (result != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to present swap chain image!");
+
+        m_CurrentFrame = (m_CurrentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
     void Application::CleanupVulkan() {
-        m_Device.destroySemaphore(m_ImageAvailableSemaphore);
-        m_Device.destroySemaphore(m_RenderFinishedSemaphore);
-        m_Device.destroyFence(m_InFlightFence);
+        CleanupSwapchain();
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            m_Device.destroySemaphore(m_ImageAvailableSemaphores[i]);
+            m_Device.destroySemaphore(m_RenderFinishedSemaphores[i]);
+            m_Device.destroyFence(m_InFlightFences[i]);
+        }
 
         m_Device.destroyCommandPool(m_CommandPool);
-
-        for (auto framebuffer: m_SwapchainFramebuffers)
-            m_Device.destroyFramebuffer(framebuffer);
 
         m_Device.destroyPipeline(m_GraphicsPipeline);
         m_Device.destroyPipelineLayout(m_PipelineLayout);
         m_Device.destroyRenderPass(m_RenderPass);
 
-        for (auto imageView: m_SwapchainImageViews)
-            m_Device.destroyImageView(imageView);
-
-        m_Device.destroySwapchainKHR(m_Swapchain);
         m_Device.destroy();
         m_Instance.destroySurfaceKHR(m_Surface);
         m_Instance.destroy();

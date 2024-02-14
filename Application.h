@@ -32,12 +32,20 @@ namespace Haus {
         void InitWindow();
         void CleanupGLFW();
 
+        static void FramebufferResizeCallback(GLFWwindow* window, int width, int height);
+
         GLFWwindow* m_Window;
     private:
+        const int MAX_FRAMES_IN_FLIGHT = 2;
+        uint32_t m_CurrentFrame = 0;
+
         SwapChainSupportDetails QuerySwapChainSupport(vk::PhysicalDevice device);
         vk::ShaderModule CreateShaderModule(const std::vector<char>& code);
         void RecordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex);
         void DrawFrame();
+
+        void CleanupSwapchain();
+        void RecreateSwapchain();
 
         void InitVulkan();
         void CreateInstance();
@@ -50,7 +58,7 @@ namespace Haus {
         void CreateGraphicsPipeline();
         void CreateFramebuffers();
         void CreateCommandPool();
-        void CreateCommandBuffer();
+        void CreateCommandBuffers();
         void CreateSyncObjects();
 
         void CleanupVulkan();
@@ -73,11 +81,13 @@ namespace Haus {
         vk::Pipeline m_GraphicsPipeline;
 
         vk::CommandPool m_CommandPool;
-        vk::CommandBuffer m_CommandBuffer;
+        std::vector<vk::CommandBuffer> m_CommandBuffers;
 
-        vk::Semaphore m_ImageAvailableSemaphore;
-        vk::Semaphore m_RenderFinishedSemaphore;
-        vk::Fence m_InFlightFence;
+        std::vector<vk::Semaphore> m_ImageAvailableSemaphores;
+        std::vector<vk::Semaphore> m_RenderFinishedSemaphores;
+        std::vector<vk::Fence> m_InFlightFences;
+
+        bool m_FramebufferResized = false;
 
         vk::Queue m_GraphicsQueue;
     };
