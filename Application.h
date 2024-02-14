@@ -36,6 +36,8 @@ namespace Haus {
     private:
         SwapChainSupportDetails QuerySwapChainSupport(vk::PhysicalDevice device);
         vk::ShaderModule CreateShaderModule(const std::vector<char>& code);
+        void RecordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex);
+        void DrawFrame();
 
         void InitVulkan();
         void CreateInstance();
@@ -47,23 +49,30 @@ namespace Haus {
         void CreateRenderPass();
         void CreateGraphicsPipeline();
         void CreateFramebuffers();
+        void CreateCommandPool();
+        void CreateCommandBuffer();
 
         void CleanupVulkan();
 
         vk::Instance m_Instance;
+        vk::SurfaceKHR m_Surface;
         vk::PhysicalDevice m_PhysicalDevice;
         vk::Device m_Device;
 
-        vk::SurfaceKHR m_Surface;
         vk::SwapchainKHR m_Swapchain;
         std::vector<vk::Image> m_SwapchainImages;
         std::vector<vk::ImageView> m_SwapchainImageViews;
         vk::Format m_SwapchainImageFormat;
         vk::Extent2D m_SwapchainExtent;
+        std::vector<vk::Framebuffer> m_SwapchainFramebuffers;
+
         vk::RenderPass m_RenderPass;
+
         vk::PipelineLayout m_PipelineLayout;
         vk::Pipeline m_GraphicsPipeline;
-        std::vector<vk::Framebuffer> m_SwapchainFramebuffers;
+
+        vk::CommandPool m_CommandPool;
+        vk::CommandBuffer m_CommandBuffer;
 
         vk::Queue m_GraphicsQueue;
     };

@@ -29,6 +29,7 @@ namespace Haus {
     void Application::Loop() {
         while (!glfwWindowShouldClose(m_Window)) {
             glfwPollEvents();
+            DrawFrame();
         }
     }
 
@@ -69,6 +70,8 @@ namespace Haus {
         CreateRenderPass();
         CreateGraphicsPipeline();
         CreateFramebuffers();
+        CreateCommandPool();
+        CreateCommandBuffer();
     }
 
     void Application::CreateInstance() {
@@ -101,6 +104,7 @@ namespace Haus {
             throw std::runtime_error("Failed to create window surface!");
     }
 
+    // TODO - Do Later perhaps?
     bool IsDeviceSuitable(vk::PhysicalDevice device) {
         vk::PhysicalDeviceProperties deviceProperties = device.getProperties();
         vk::PhysicalDeviceFeatures deviceFeatures = device.getFeatures();
@@ -122,6 +126,10 @@ namespace Haus {
 
         if (m_PhysicalDevice == VK_NULL_HANDLE)
             throw std::runtime_error("Failed to find a suitable GPU!");
+
+        vk::PhysicalDeviceProperties deviceProperties = m_PhysicalDevice.getProperties();
+        std::cout << deviceProperties.deviceName << std::endl;
+        std::cout << to_string(deviceProperties.deviceType) << std::endl;
     }
 
     void Application::CreateLogicalDevice() {
@@ -225,33 +233,33 @@ namespace Haus {
     }
 
     void Application::CreateRenderPass() {
-        vk::AttachmentDescription colorAttachment {
-            .format = m_SwapchainImageFormat,
-            .samples = vk::SampleCountFlagBits::e1,
-            .loadOp = vk::AttachmentLoadOp::eClear,
-            .storeOp = vk::AttachmentStoreOp::eStore,
-            .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
-            .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
-            .initialLayout = vk::ImageLayout::eUndefined,
-            .finalLayout = vk::ImageLayout::ePresentSrcKHR
+        vk::AttachmentDescription colorAttachment{
+                .format = m_SwapchainImageFormat,
+                .samples = vk::SampleCountFlagBits::e1,
+                .loadOp = vk::AttachmentLoadOp::eClear,
+                .storeOp = vk::AttachmentStoreOp::eStore,
+                .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+                .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+                .initialLayout = vk::ImageLayout::eUndefined,
+                .finalLayout = vk::ImageLayout::ePresentSrcKHR
         };
 
-        vk::AttachmentReference colorAttachmentReference {
-            .attachment = 0,
-            .layout = vk::ImageLayout::eColorAttachmentOptimal
+        vk::AttachmentReference colorAttachmentReference{
+                .attachment = 0,
+                .layout = vk::ImageLayout::eColorAttachmentOptimal
         };
 
         vk::SubpassDescription subpass{
-            .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
-            .colorAttachmentCount = 1,
-            .pColorAttachments = &colorAttachmentReference,
+                .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
+                .colorAttachmentCount = 1,
+                .pColorAttachments = &colorAttachmentReference,
         };
 
-        vk::RenderPassCreateInfo renderPassInfo {
-            .attachmentCount = 1,
-            .pAttachments = &colorAttachment,
-            .subpassCount = 1,
-            .pSubpasses = &subpass
+        vk::RenderPassCreateInfo renderPassInfo{
+                .attachmentCount = 1,
+                .pAttachments = &colorAttachment,
+                .subpassCount = 1,
+                .pSubpasses = &subpass
         };
 
         if (m_Device.createRenderPass(&renderPassInfo, nullptr, &m_RenderPass) != vk::Result::eSuccess)
@@ -330,25 +338,9 @@ namespace Haus {
                 .primitiveRestartEnable = VK_FALSE
         };
 
-        vk::Viewport viewport{
-                .x = 0.0f,
-                .y = 0.0f,
-                .width = (float) m_SwapchainExtent.width,
-                .height = (float) m_SwapchainExtent.height,
-                .minDepth = 0.0f,
-                .maxDepth = 1.0f,
-        };
-
-        vk::Rect2D scissor{
-                .offset = {0, 0},
-                .extent = m_SwapchainExtent
-        };
-
         vk::PipelineViewportStateCreateInfo viewportState{
                 .viewportCount = 1,
-                .pViewports = &viewport,
                 .scissorCount = 1,
-                .pScissors = &scissor
         };
 
         vk::PipelineRasterizationStateCreateInfo rasterizer{
@@ -384,28 +376,29 @@ namespace Haus {
         if (m_Device.createPipelineLayout(&pipelineLayoutInfo, nullptr, &m_PipelineLayout) != vk::Result::eSuccess)
             throw std::runtime_error("Failed to create pipeline layout!");
 
-        vk::GraphicsPipelineCreateInfo pipelineInfo {
-            .stageCount = static_cast<uint32_t>(shaderStages.size()),
-            .pStages = shaderStages.data(),
-            .pVertexInputState = &vertexInputInfo,
-            .pInputAssemblyState = &inputAssembly,
-            .pViewportState = &viewportState,
-            .pRasterizationState = &rasterizer,
-            .pMultisampleState = &multisampling,
-            .pColorBlendState = &colorBlending,
-            .pDynamicState = &dynamicState,
-            .layout = m_PipelineLayout,
-            .renderPass = m_RenderPass,
-            .subpass = 0,
+        vk::GraphicsPipelineCreateInfo pipelineInfo{
+                .stageCount = static_cast<uint32_t>(shaderStages.size()),
+                .pStages = shaderStages.data(),
+                .pVertexInputState = &vertexInputInfo,
+                .pInputAssemblyState = &inputAssembly,
+                .pViewportState = &viewportState,
+                .pRasterizationState = &rasterizer,
+                .pMultisampleState = &multisampling,
+                .pColorBlendState = &colorBlending,
+                .pDynamicState = &dynamicState,
+                .layout = m_PipelineLayout,
+                .renderPass = m_RenderPass,
+                .subpass = 0,
 
-            // Vulkan allows you to create a new graphics pipeline by deriving from an existing pipeline.
-            // The idea of pipeline derivatives is that it is less expensive to set up pipelines when they have much functionality
-            // in common with an existing pipeline and switching between pipelines from the same parent can also be done quicker.
-            .basePipelineHandle = VK_NULL_HANDLE,
-            .basePipelineIndex = -1
+                // Vulkan allows you to create a new graphics pipeline by deriving from an existing pipeline.
+                // The idea of pipeline derivatives is that it is less expensive to set up pipelines when they have much functionality
+                // in common with an existing pipeline and switching between pipelines from the same parent can also be done quicker.
+                .basePipelineHandle = VK_NULL_HANDLE,
+                .basePipelineIndex = -1
         };
 
-        if (m_Device.createGraphicsPipelines(VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_GraphicsPipeline) != vk::Result::eSuccess)
+        if (m_Device.createGraphicsPipelines(VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_GraphicsPipeline) !=
+            vk::Result::eSuccess)
             throw std::runtime_error("Failed to create Graphics Pipeline");
 
         m_Device.destroyShaderModule(vertexShaderModule);
@@ -420,22 +413,95 @@ namespace Haus {
                     m_SwapchainImageViews[i]
             };
 
-            vk::FramebufferCreateInfo framebufferInfo {
-                .renderPass = m_RenderPass,
-                .attachmentCount = 1,
-                .pAttachments = attachments,
-                .width = m_SwapchainExtent.width,
-                .height = m_SwapchainExtent.height,
-                .layers = 1
+            vk::FramebufferCreateInfo framebufferInfo{
+                    .renderPass = m_RenderPass,
+                    .attachmentCount = 1,
+                    .pAttachments = attachments,
+                    .width = m_SwapchainExtent.width,
+                    .height = m_SwapchainExtent.height,
+                    .layers = 1
             };
 
-            if (m_Device.createFramebuffer(&framebufferInfo, nullptr, &m_SwapchainFramebuffers[i]) != vk::Result::eSuccess)
+            if (m_Device.createFramebuffer(&framebufferInfo, nullptr, &m_SwapchainFramebuffers[i]) !=
+                vk::Result::eSuccess)
                 throw std::runtime_error("Failed to create framebuffer");
         }
     }
 
+    void Application::CreateCommandPool() {
+        vk::CommandPoolCreateInfo poolInfo{
+                .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+                .queueFamilyIndex = 0
+        };
+
+        if (m_Device.createCommandPool(&poolInfo, nullptr, &m_CommandPool) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to create command pool");
+    }
+
+    void Application::CreateCommandBuffer() {
+        vk::CommandBufferAllocateInfo allocateInfo{
+                .commandPool = m_CommandPool,
+                .level = vk::CommandBufferLevel::ePrimary,
+                .commandBufferCount = 1
+        };
+
+        if (m_Device.allocateCommandBuffers(&allocateInfo, &m_CommandBuffer) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to allocate command buffers");
+    }
+
+    void Application::RecordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex) {
+        vk::CommandBufferBeginInfo beginInfo{};
+
+        if (commandBuffer.begin(&beginInfo) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to begin recording command buffer");
+
+        vk::ClearValue clearColor = {{{{0.5f, 0.5f, 0.5f, 1.0f}}}};
+        vk::RenderPassBeginInfo renderPassInfo{
+                .renderPass = m_RenderPass,
+                .framebuffer = m_SwapchainFramebuffers[imageIndex],
+                .renderArea {
+                        .offset = {0, 0},
+                        .extent = m_SwapchainExtent
+                },
+                .clearValueCount = 1,
+                .pClearValues = &clearColor
+        };
+
+        commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
+
+        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_GraphicsPipeline);
+
+        vk::Viewport viewport{
+                .x = 0.0f,
+                .y = 0.0f,
+                .width = (float) m_SwapchainExtent.width,
+                .height = (float) m_SwapchainExtent.height,
+                .minDepth = 0.0f,
+                .maxDepth = 1.0f,
+        };
+
+        vk::Rect2D scissor{
+                .offset = {0, 0},
+                .extent = m_SwapchainExtent
+        };
+
+        commandBuffer.setViewport(0, 1, &viewport);
+        commandBuffer.setScissor(0, 1, &scissor);
+
+        commandBuffer.draw(3, 1, 0, 0);
+
+        commandBuffer.endRenderPass();
+        commandBuffer.end();
+    }
+
+    void Application::DrawFrame() {
+
+    }
+
     void Application::CleanupVulkan() {
-        for (auto framebuffer : m_SwapchainFramebuffers)
+        m_Device.destroyCommandPool(m_CommandPool);
+
+        for (auto framebuffer: m_SwapchainFramebuffers)
             m_Device.destroyFramebuffer(framebuffer);
 
         m_Device.destroyPipeline(m_GraphicsPipeline);
