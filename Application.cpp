@@ -31,6 +31,8 @@ namespace Haus {
             glfwPollEvents();
             DrawFrame();
         }
+
+        m_Device.waitIdle();
     }
 
 #pragma endregion APPLICATION
@@ -72,6 +74,7 @@ namespace Haus {
         CreateFramebuffers();
         CreateCommandPool();
         CreateCommandBuffer();
+        CreateSyncObjects();
     }
 
     void Application::CreateInstance() {
@@ -255,11 +258,22 @@ namespace Haus {
                 .pColorAttachments = &colorAttachmentReference,
         };
 
+        vk::SubpassDependency dependency{
+            .srcSubpass = VK_SUBPASS_EXTERNAL,
+            .dstSubpass = 0,
+            .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+            .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+            .srcAccessMask = vk::AccessFlagBits::eNone,
+            .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite
+        };
+
         vk::RenderPassCreateInfo renderPassInfo{
                 .attachmentCount = 1,
                 .pAttachments = &colorAttachment,
                 .subpassCount = 1,
-                .pSubpasses = &subpass
+                .pSubpasses = &subpass,
+                .dependencyCount = 1,
+                .pDependencies = &dependency
         };
 
         if (m_Device.createRenderPass(&renderPassInfo, nullptr, &m_RenderPass) != vk::Result::eSuccess)
@@ -449,6 +463,18 @@ namespace Haus {
             throw std::runtime_error("Failed to allocate command buffers");
     }
 
+    void Application::CreateSyncObjects() {
+        vk::SemaphoreCreateInfo semaphoreInfo{};
+        vk::FenceCreateInfo fenceInfo{
+            .flags = vk::FenceCreateFlagBits::eSignaled
+        };
+
+        if (m_Device.createSemaphore(&semaphoreInfo, nullptr, &m_ImageAvailableSemaphore) != vk::Result::eSuccess ||
+            m_Device.createSemaphore(&semaphoreInfo, nullptr, &m_RenderFinishedSemaphore) != vk::Result::eSuccess ||
+            m_Device.createFence(&fenceInfo, nullptr, &m_InFlightFence) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to create Semaphores!");
+    }
+
     void Application::RecordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex) {
         vk::CommandBufferBeginInfo beginInfo{};
 
@@ -495,10 +521,50 @@ namespace Haus {
     }
 
     void Application::DrawFrame() {
+        while (vk::Result::eTimeout == m_Device.waitForFences(1, &m_InFlightFence, VK_TRUE, UINT64_MAX));
+        m_Device.resetFences(1, &m_InFlightFence);
 
+        uint32_t imageIndex;
+        m_Device.acquireNextImageKHR(m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+        m_CommandBuffer.reset();
+        RecordCommandBuffer(m_CommandBuffer, imageIndex);
+
+
+        vk::Semaphore waitSemaphores[] = {m_ImageAvailableSemaphore};
+        vk::Semaphore signalSemaphores[] = {m_RenderFinishedSemaphore};
+        vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
+        vk::SubmitInfo submitInfo{
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = waitSemaphores,
+            .pWaitDstStageMask = waitStages,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &m_CommandBuffer,
+            .signalSemaphoreCount = 1,
+            .pSignalSemaphores = signalSemaphores,
+        };
+
+        if (m_GraphicsQueue.submit(1, &submitInfo, m_InFlightFence) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to submit draw command buffer");
+
+        vk::SwapchainKHR swapchains[] = {m_Swapchain};
+
+        vk::PresentInfoKHR presentInfo{
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = signalSemaphores,
+            .swapchainCount = 1,
+            .pSwapchains = swapchains,
+            .pImageIndices = &imageIndex
+        };
+
+        m_GraphicsQueue.presentKHR(&presentInfo);
     }
 
     void Application::CleanupVulkan() {
+        m_Device.destroySemaphore(m_ImageAvailableSemaphore);
+        m_Device.destroySemaphore(m_RenderFinishedSemaphore);
+        m_Device.destroyFence(m_InFlightFence);
+
         m_Device.destroyCommandPool(m_CommandPool);
 
         for (auto framebuffer: m_SwapchainFramebuffers)

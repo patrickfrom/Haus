@@ -51,6 +51,7 @@ namespace Haus {
         void CreateFramebuffers();
         void CreateCommandPool();
         void CreateCommandBuffer();
+        void CreateSyncObjects();
 
         void CleanupVulkan();
 
@@ -73,6 +74,10 @@ namespace Haus {
 
         vk::CommandPool m_CommandPool;
         vk::CommandBuffer m_CommandBuffer;
+
+        vk::Semaphore m_ImageAvailableSemaphore;
+        vk::Semaphore m_RenderFinishedSemaphore;
+        vk::Fence m_InFlightFence;
 
         vk::Queue m_GraphicsQueue;
     };
