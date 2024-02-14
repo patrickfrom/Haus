@@ -46,6 +46,7 @@ namespace Haus {
         void CreateImageViews();
         void CreateRenderPass();
         void CreateGraphicsPipeline();
+        void CreateFramebuffers();
 
         void CleanupVulkan();
 

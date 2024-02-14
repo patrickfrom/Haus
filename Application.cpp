@@ -68,6 +68,7 @@ namespace Haus {
         CreateImageViews();
         CreateRenderPass();
         CreateGraphicsPipeline();
+        CreateFramebuffers();
     }
 
     void Application::CreateInstance() {
@@ -411,7 +412,32 @@ namespace Haus {
         m_Device.destroyShaderModule(fragmentShaderModule);
     }
 
+    void Application::CreateFramebuffers() {
+        m_SwapchainFramebuffers.resize(m_SwapchainImageViews.size());
+
+        for (size_t i = 0; i < m_SwapchainImageViews.size(); i++) {
+            vk::ImageView attachments[] = {
+                    m_SwapchainImageViews[i]
+            };
+
+            vk::FramebufferCreateInfo framebufferInfo {
+                .renderPass = m_RenderPass,
+                .attachmentCount = 1,
+                .pAttachments = attachments,
+                .width = m_SwapchainExtent.width,
+                .height = m_SwapchainExtent.height,
+                .layers = 1
+            };
+
+            if (m_Device.createFramebuffer(&framebufferInfo, nullptr, &m_SwapchainFramebuffers[i]) != vk::Result::eSuccess)
+                throw std::runtime_error("Failed to create framebuffer");
+        }
+    }
+
     void Application::CleanupVulkan() {
+        for (auto framebuffer : m_SwapchainFramebuffers)
+            m_Device.destroyFramebuffer(framebuffer);
+
         m_Device.destroyPipeline(m_GraphicsPipeline);
         m_Device.destroyPipelineLayout(m_PipelineLayout);
         m_Device.destroyRenderPass(m_RenderPass);
