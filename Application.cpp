@@ -2,11 +2,52 @@
 #include <iostream>
 #include <format>
 #include <fstream>
+#include <glm/glm.hpp>
 
 /* Currently using regions, just so it's easier for me to
    see what's going on since I don't want to abstract
    Vulkan or GLFW until I understand them a little better*/
 namespace Haus {
+    struct Vertex {
+        glm::vec2 Position;
+        glm::vec3 Color;
+
+        static vk::VertexInputBindingDescription GetBindingDescription() {
+            vk::VertexInputBindingDescription bindingDescription {
+                .binding = 0,
+                .stride = sizeof(Vertex),
+                .inputRate = vk::VertexInputRate::eVertex
+            };
+
+            return bindingDescription;
+        }
+
+        static std::array<vk::VertexInputAttributeDescription, 2> GetAttributeDescriptions() {
+            std::array<vk::VertexInputAttributeDescription, 2> attributeDescription {
+                vk::VertexInputAttributeDescription {
+                    .location = 0,
+                    .binding = 0,
+                    .format = vk::Format::eR32G32Sfloat,
+                    .offset = offsetof(Vertex, Position)
+                },
+                vk::VertexInputAttributeDescription {
+                        .location = 1,
+                        .binding = 0,
+                        .format = vk::Format::eR32G32B32Sfloat,
+                        .offset = offsetof(Vertex, Color)
+                }
+            };
+
+            return attributeDescription;
+        }
+    };
+
+    const std::vector<Vertex> vertices = {
+            {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+            {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+            {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+    };
+
 #pragma region APPLICATION
 
     Application::Application(ApplicationSpecification &specification) : m_Specification(specification) {}
@@ -81,6 +122,7 @@ namespace Haus {
         CreateGraphicsPipeline();
         CreateFramebuffers();
         CreateCommandPool();
+        CreateVertexBuffer();
         CreateCommandBuffers();
         CreateSyncObjects();
     }
@@ -380,9 +422,14 @@ namespace Haus {
                 .pDynamicStates = dynamicStates.data()
         };
 
+        auto bindingDescription = Vertex::GetBindingDescription();
+        auto attributeDescriptions = Vertex::GetAttributeDescriptions();
+
         vk::PipelineVertexInputStateCreateInfo vertexInputInfo{
-                .vertexBindingDescriptionCount = 0,
-                .vertexAttributeDescriptionCount = 0,
+                .vertexBindingDescriptionCount = 1,
+                .pVertexBindingDescriptions = &bindingDescription,
+                .vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()),
+                .pVertexAttributeDescriptions = attributeDescriptions.data()
         };
 
         vk::PipelineInputAssemblyStateCreateInfo inputAssembly{
@@ -488,6 +535,21 @@ namespace Haus {
 
         if (m_Device.createCommandPool(&poolInfo, nullptr, &m_CommandPool) != vk::Result::eSuccess)
             throw std::runtime_error("Failed to create command pool");
+    }
+
+    void Application::CreateVertexBuffer() {
+        vk::BufferCreateInfo bufferInfo {
+            .size = sizeof(vertices[0]) * vertices.size(),
+            .usage = vk::BufferUsageFlagBits::eVertexBuffer,
+            .sharingMode = vk::SharingMode::eExclusive
+        };
+
+        if (m_Device.createBuffer(&bufferInfo, nullptr, &m_VertexBuffer) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to create vertex buffer");
+
+        vk::MemoryRequirements memoryRequirements = m_Device.getBufferMemoryRequirements(m_VertexBuffer);
+        // Memory Requirements
+        // https://vulkan-tutorial.com/Vertex_buffers/Vertex_buffer_creation
     }
 
     void Application::CreateCommandBuffers() {
@@ -626,6 +688,8 @@ namespace Haus {
 
     void Application::CleanupVulkan() {
         CleanupSwapchain();
+
+        m_Device.destroyBuffer(m_VertexBuffer);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             m_Device.destroySemaphore(m_ImageAvailableSemaphores[i]);

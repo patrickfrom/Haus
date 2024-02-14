@@ -58,6 +58,7 @@ namespace Haus {
         void CreateGraphicsPipeline();
         void CreateFramebuffers();
         void CreateCommandPool();
+        void CreateVertexBuffer();
         void CreateCommandBuffers();
         void CreateSyncObjects();
 
@@ -86,6 +87,8 @@ namespace Haus {
         std::vector<vk::Semaphore> m_ImageAvailableSemaphores;
         std::vector<vk::Semaphore> m_RenderFinishedSemaphores;
         std::vector<vk::Fence> m_InFlightFences;
+
+        vk::Buffer m_VertexBuffer;
 
         bool m_FramebufferResized = false;
 
