@@ -66,6 +66,7 @@ namespace Haus {
         void CreateFramebuffers();
         void CreateCommandPool();
         void CreateVertexBuffer();
+        void CreateIndexBuffer();
         void CreateCommandBuffers();
         void CreateSyncObjects();
 
@@ -97,6 +98,9 @@ namespace Haus {
 
         vk::Buffer m_VertexBuffer;
         vk::DeviceMemory m_VertexBufferMemory;
+
+        vk::Buffer m_IndexBuffer;
+        vk::DeviceMemory m_IndexBufferMemory;
 
         vk::ClearValue m_ClearColor = {{{{0.0f, 0.0f, 0.0f, 1.0}}}};
 

@@ -42,15 +42,16 @@ namespace Haus {
         }
     };
 
-    // TODO: Later this will use Indices
     const std::vector<Vertex> vertices = {
-            {{0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}},
-            {{0.5f, -0.5f},  {1.0f, 0.32f, 0.32f}},
-            {{-0.5f,  -0.5f},  {1.0f, 0.29f, 0.14f}},
+            {{0.5f,  0.5f},  {1.0f, 0.0f,  0.0f}},
+            {{0.5f,  -0.5f}, {1.0f, 0.32f, 0.32f}},
+            {{-0.5f, -0.5f}, {1.0f, 0.29f, 0.14f}},
+            {{-0.5f, 0.5f},  {1.0f, 0.32f, 0.32f}}
+    };
 
-            {{-0.5f,  -0.5f},  {1.0f, 0.29f, 0.14f}},
-            {{-0.5f, 0.5f},  {1.0f, 0.32f, 0.32f}},
-            {{0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}},
+    const std::vector<uint16_t> indices{
+            0, 1, 2,
+            2, 3, 0
     };
 
 #pragma region APPLICATION
@@ -73,12 +74,8 @@ namespace Haus {
     }
 
     void Application::Loop() {
-        float time = 0;
         while (!glfwWindowShouldClose(m_Window)) {
-            time += 0.001;
-
             glfwPollEvents();
-            SetClearColor({glm::sin(time), glm::cos(time * 0.25), glm::cos(time), 1.0f});
             DrawFrame();
         }
 
@@ -132,6 +129,7 @@ namespace Haus {
         CreateFramebuffers();
         CreateCommandPool();
         CreateVertexBuffer();
+        CreateIndexBuffer();
         CreateCommandBuffers();
         CreateSyncObjects();
     }
@@ -559,6 +557,8 @@ namespace Haus {
         throw std::runtime_error("Failed to find suitable memory type");
     }
 
+
+    // TODO: Look into Staging Buffer https://vulkan-tutorial.com/Vertex_buffers/Staging_buffer
     void Application::CreateVertexBuffer() {
         vk::BufferCreateInfo bufferInfo{
                 .size = sizeof(vertices[0]) * vertices.size(),
@@ -583,9 +583,38 @@ namespace Haus {
 
         m_Device.bindBufferMemory(m_VertexBuffer, m_VertexBufferMemory, 0);
 
-        void* data = m_Device.mapMemory(m_VertexBufferMemory, 0, bufferInfo.size);
+        void *data = m_Device.mapMemory(m_VertexBufferMemory, 0, bufferInfo.size);
         memcpy(data, vertices.data(), (size_t) bufferInfo.size);
         m_Device.unmapMemory(m_VertexBufferMemory);
+    }
+
+    void Application::CreateIndexBuffer() {
+        vk::BufferCreateInfo bufferInfo{
+                .size = sizeof(indices[0]) * indices.size(),
+                .usage = vk::BufferUsageFlagBits::eIndexBuffer,
+                .sharingMode = vk::SharingMode::eExclusive
+        };
+
+        if (m_Device.createBuffer(&bufferInfo, nullptr, &m_IndexBuffer) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to create index buffer");
+
+        vk::MemoryRequirements memoryRequirements = m_Device.getBufferMemoryRequirements(m_IndexBuffer);
+
+        vk::MemoryAllocateInfo allocateInfo{
+                .allocationSize = memoryRequirements.size,
+                .memoryTypeIndex = FindMemoryType(memoryRequirements.memoryTypeBits,
+                                                  vk::MemoryPropertyFlagBits::eHostVisible |
+                                                  vk::MemoryPropertyFlagBits::eHostCoherent)
+        };
+
+        if (m_Device.allocateMemory(&allocateInfo, nullptr, &m_IndexBufferMemory) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to allocate index buffer memory");
+
+        m_Device.bindBufferMemory(m_IndexBuffer, m_IndexBufferMemory, 0);
+
+        void* data = m_Device.mapMemory(m_IndexBufferMemory, 0, bufferInfo.size);
+        memcpy(data, indices.data(), (size_t) bufferInfo.size);
+        m_Device.unmapMemory(m_IndexBufferMemory);
     }
 
     void Application::CreateCommandBuffers() {
@@ -660,10 +689,11 @@ namespace Haus {
         commandBuffer.setScissor(0, 1, &scissor);
 
         vk::Buffer vertexBuffers[] = {m_VertexBuffer};
-        vk::DeviceSize  offsets[] = {0};
+        vk::DeviceSize offsets[] = {0};
         commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
+        commandBuffer.bindIndexBuffer(m_IndexBuffer, 0, vk::IndexType::eUint16);
 
-        commandBuffer.draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+        commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
         commandBuffer.endRenderPass();
         commandBuffer.end();
@@ -727,6 +757,9 @@ namespace Haus {
 
     void Application::CleanupVulkan() {
         CleanupSwapchain();
+
+        m_Device.destroyBuffer(m_IndexBuffer);
+        m_Device.freeMemory(m_IndexBufferMemory);
 
         m_Device.destroyBuffer(m_VertexBuffer);
         m_Device.freeMemory(m_VertexBufferMemory);
