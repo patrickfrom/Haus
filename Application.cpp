@@ -42,10 +42,15 @@ namespace Haus {
         }
     };
 
+    // TODO: Later this will use Indices
     const std::vector<Vertex> vertices = {
-            {{0.0f,  -0.5f}, {1.0f, 0.0f, 0.0f}},
-            {{0.5f,  0.5f},  {1.0f, 0.29f, 0.14f}},
-            {{-0.5f, 0.5f},  {1.0f, 0.32f, 0.32f}},
+            {{0.5f,  -0.5f}, {1.0f, 0.0f, 0.0f}},
+            {{0.5f, 0.5f},  {1.0f, 0.32f, 0.32f}},
+            {{-0.5f,  0.5f},  {1.0f, 0.29f, 0.14f}},
+
+            {{-0.5f,  0.5f},  {1.0f, 0.29f, 0.14f}},
+            {{-0.5f, -0.5f},  {1.0f, 0.32f, 0.32f}},
+            {{0.5f,  -0.5f}, {1.0f, 0.0f, 0.0f}}
     };
 
 #pragma region APPLICATION
