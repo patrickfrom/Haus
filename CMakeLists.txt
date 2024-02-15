@@ -13,8 +13,9 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(vendors/GLFW)
 add_subdirectory(vendors/glm)
+add_subdirectory(vendors/imgui)
 
 find_package(Vulkan REQUIRED)
 
 
-target_link_libraries(Haus vulkan glfw glm::glm)
+target_link_libraries(Haus PRIVATE Vulkan::Vulkan glfw glm::glm imgui)

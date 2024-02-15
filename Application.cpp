@@ -1,4 +1,6 @@
 #include "Application.h"
+#include "imgui_impl_vulkan.h"
+#include "imgui_impl_glfw.h"
 #include <iostream>
 #include <format>
 #include <fstream>
@@ -63,6 +65,29 @@ namespace Haus {
 
         InitWindow();
         InitVulkan();
+
+        // TODO: Setup ImGui Later
+        /*IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+
+        ImGui::StyleColorsDark();
+
+        ImGui_ImplVulkan_InitInfo initInfo = {
+                .Instance = m_Instance,
+                .PhysicalDevice = m_PhysicalDevice,
+                .Device = m_Device,
+                .Queue = m_GraphicsQueue,
+                .RenderPass = m_RenderPass,
+                .MinImageCount = m_MinImageCount,
+                .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
+                .Subpass = 0,
+        };
+        ImGui_ImplVulkan_Init(&initInfo);*/
+
         Loop();
     }
 
@@ -243,6 +268,8 @@ namespace Haus {
         uint32_t imageCount = swapChainSupport.Capabilities.minImageCount + 1;
         if (swapChainSupport.Capabilities.maxImageCount > 0 && imageCount > swapChainSupport.Capabilities.maxImageCount)
             imageCount = swapChainSupport.Capabilities.maxImageCount;
+
+        m_MinImageCount = imageCount;
 
         vk::SwapchainCreateInfoKHR createInfo{
                 .surface = m_Surface,

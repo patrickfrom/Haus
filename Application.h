@@ -3,6 +3,7 @@
 #define VULKAN_HPP_NO_CONSTRUCTORS
 #include <vulkan/vulkan.hpp>
 
+#include <imgui.h>
 #include <GLFW/glfw3.h>
 #include "glm/vec4.hpp"
 
@@ -44,6 +45,8 @@ namespace Haus {
     private:
         const int MAX_FRAMES_IN_FLIGHT = 2;
         uint32_t m_CurrentFrame = 0;
+
+        uint32_t m_MinImageCount;
 
         SwapChainSupportDetails QuerySwapChainSupport(vk::PhysicalDevice device);
         vk::ShaderModule CreateShaderModule(const std::vector<char>& code);
