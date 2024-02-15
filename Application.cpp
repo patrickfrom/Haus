@@ -73,8 +73,12 @@ namespace Haus {
     }
 
     void Application::Loop() {
+        float time = 0;
         while (!glfwWindowShouldClose(m_Window)) {
+            time += 0.001;
+
             glfwPollEvents();
+            SetClearColor({glm::sin(time), glm::cos(time * 0.25), glm::cos(time), 1.0f});
             DrawFrame();
         }
 
@@ -623,7 +627,6 @@ namespace Haus {
         if (commandBuffer.begin(&beginInfo) != vk::Result::eSuccess)
             throw std::runtime_error("Failed to begin recording command buffer");
 
-        vk::ClearValue clearColor = {{{{0.5f, 0.5f, 1.0f, 1.0f}}}};
         vk::RenderPassBeginInfo renderPassInfo{
                 .renderPass = m_RenderPass,
                 .framebuffer = m_SwapchainFramebuffers[imageIndex],
@@ -632,7 +635,7 @@ namespace Haus {
                         .extent = m_SwapchainExtent
                 },
                 .clearValueCount = 1,
-                .pClearValues = &clearColor
+                .pClearValues = &m_ClearColor
         };
 
         commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);

@@ -4,6 +4,7 @@
 #include <vulkan/vulkan.hpp>
 
 #include <GLFW/glfw3.h>
+#include "glm/vec4.hpp"
 
 namespace Haus {
     struct ApplicationSpecification {
@@ -35,6 +36,11 @@ namespace Haus {
         static void FramebufferResizeCallback(GLFWwindow* window, int width, int height);
 
         GLFWwindow* m_Window;
+
+    public:
+        void SetClearColor(glm::vec4 color) {
+            m_ClearColor = {{{{color.x, color.y, color.z, color.w}}}};
+        }
     private:
         const int MAX_FRAMES_IN_FLIGHT = 2;
         uint32_t m_CurrentFrame = 0;
@@ -91,6 +97,8 @@ namespace Haus {
 
         vk::Buffer m_VertexBuffer;
         vk::DeviceMemory m_VertexBufferMemory;
+
+        vk::ClearValue m_ClearColor = {{{{0.0f, 0.0f, 0.0f, 1.0}}}};
 
         bool m_FramebufferResized = false;
 
