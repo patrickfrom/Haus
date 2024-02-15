@@ -13,29 +13,29 @@ namespace Haus {
         glm::vec3 Color;
 
         static vk::VertexInputBindingDescription GetBindingDescription() {
-            vk::VertexInputBindingDescription bindingDescription {
-                .binding = 0,
-                .stride = sizeof(Vertex),
-                .inputRate = vk::VertexInputRate::eVertex
+            vk::VertexInputBindingDescription bindingDescription{
+                    .binding = 0,
+                    .stride = sizeof(Vertex),
+                    .inputRate = vk::VertexInputRate::eVertex
             };
 
             return bindingDescription;
         }
 
         static std::array<vk::VertexInputAttributeDescription, 2> GetAttributeDescriptions() {
-            std::array<vk::VertexInputAttributeDescription, 2> attributeDescription {
-                vk::VertexInputAttributeDescription {
-                    .location = 0,
-                    .binding = 0,
-                    .format = vk::Format::eR32G32Sfloat,
-                    .offset = offsetof(Vertex, Position)
-                },
-                vk::VertexInputAttributeDescription {
-                        .location = 1,
-                        .binding = 0,
-                        .format = vk::Format::eR32G32B32Sfloat,
-                        .offset = offsetof(Vertex, Color)
-                }
+            std::array<vk::VertexInputAttributeDescription, 2> attributeDescription{
+                    vk::VertexInputAttributeDescription{
+                            .location = 0,
+                            .binding = 0,
+                            .format = vk::Format::eR32G32Sfloat,
+                            .offset = offsetof(Vertex, Position)
+                    },
+                    vk::VertexInputAttributeDescription{
+                            .location = 1,
+                            .binding = 0,
+                            .format = vk::Format::eR32G32B32Sfloat,
+                            .offset = offsetof(Vertex, Color)
+                    }
             };
 
             return attributeDescription;
@@ -43,9 +43,9 @@ namespace Haus {
     };
 
     const std::vector<Vertex> vertices = {
-            {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-            {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-            {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+            {{0.0f,  -0.5f}, {1.0f, 0.0f, 0.0f}},
+            {{0.5f,  0.5f},  {1.0f, 0.29f, 0.14f}},
+            {{-0.5f, 0.5f},  {1.0f, 0.32f, 0.32f}},
     };
 
 #pragma region APPLICATION
@@ -537,19 +537,46 @@ namespace Haus {
             throw std::runtime_error("Failed to create command pool");
     }
 
+    uint32_t Application::FindMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
+        vk::PhysicalDeviceMemoryProperties memoryProperties = m_PhysicalDevice.getMemoryProperties();
+
+        //TODO No idea how this works yet tbh, my brain can't wrap around it so take a deeper look into this later on
+        for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
+            std::cout << to_string(memoryProperties.memoryTypes[i].propertyFlags) << std::endl;
+            if (typeFilter & (1 << i) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
+                return i;
+        }
+
+        throw std::runtime_error("Failed to find suitable memory type");
+    }
+
     void Application::CreateVertexBuffer() {
-        vk::BufferCreateInfo bufferInfo {
-            .size = sizeof(vertices[0]) * vertices.size(),
-            .usage = vk::BufferUsageFlagBits::eVertexBuffer,
-            .sharingMode = vk::SharingMode::eExclusive
+        vk::BufferCreateInfo bufferInfo{
+                .size = sizeof(vertices[0]) * vertices.size(),
+                .usage = vk::BufferUsageFlagBits::eVertexBuffer,
+                .sharingMode = vk::SharingMode::eExclusive
         };
 
         if (m_Device.createBuffer(&bufferInfo, nullptr, &m_VertexBuffer) != vk::Result::eSuccess)
             throw std::runtime_error("Failed to create vertex buffer");
 
         vk::MemoryRequirements memoryRequirements = m_Device.getBufferMemoryRequirements(m_VertexBuffer);
-        // Memory Requirements
-        // https://vulkan-tutorial.com/Vertex_buffers/Vertex_buffer_creation
+
+        vk::MemoryAllocateInfo allocateInfo{
+                .allocationSize = memoryRequirements.size,
+                .memoryTypeIndex = FindMemoryType(memoryRequirements.memoryTypeBits,
+                                                  vk::MemoryPropertyFlagBits::eHostVisible |
+                                                  vk::MemoryPropertyFlagBits::eHostCoherent),
+        };
+
+        if (m_Device.allocateMemory(&allocateInfo, nullptr, &m_VertexBufferMemory) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to allocate vertex buffer memory!");
+
+        m_Device.bindBufferMemory(m_VertexBuffer, m_VertexBufferMemory, 0);
+
+        void* data = m_Device.mapMemory(m_VertexBufferMemory, 0, bufferInfo.size);
+        memcpy(data, vertices.data(), (size_t) bufferInfo.size);
+        m_Device.unmapMemory(m_VertexBufferMemory);
     }
 
     void Application::CreateCommandBuffers() {
@@ -591,7 +618,7 @@ namespace Haus {
         if (commandBuffer.begin(&beginInfo) != vk::Result::eSuccess)
             throw std::runtime_error("Failed to begin recording command buffer");
 
-        vk::ClearValue clearColor = {{{{0.5f, 0.5f, 0.5f, 1.0f}}}};
+        vk::ClearValue clearColor = {{{{0.5f, 0.5f, 1.0f, 1.0f}}}};
         vk::RenderPassBeginInfo renderPassInfo{
                 .renderPass = m_RenderPass,
                 .framebuffer = m_SwapchainFramebuffers[imageIndex],
@@ -624,7 +651,11 @@ namespace Haus {
         commandBuffer.setViewport(0, 1, &viewport);
         commandBuffer.setScissor(0, 1, &scissor);
 
-        commandBuffer.draw(3, 1, 0, 0);
+        vk::Buffer vertexBuffers[] = {m_VertexBuffer};
+        vk::DeviceSize  offsets[] = {0};
+        commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
+
+        commandBuffer.draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 
         commandBuffer.endRenderPass();
         commandBuffer.end();
@@ -690,6 +721,7 @@ namespace Haus {
         CleanupSwapchain();
 
         m_Device.destroyBuffer(m_VertexBuffer);
+        m_Device.freeMemory(m_VertexBufferMemory);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             m_Device.destroySemaphore(m_ImageAvailableSemaphores[i]);

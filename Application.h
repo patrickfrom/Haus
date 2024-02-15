@@ -43,6 +43,7 @@ namespace Haus {
         vk::ShaderModule CreateShaderModule(const std::vector<char>& code);
         void RecordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex);
         void DrawFrame();
+        uint32_t FindMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
 
         void CleanupSwapchain();
         void RecreateSwapchain();
@@ -89,6 +90,7 @@ namespace Haus {
         std::vector<vk::Fence> m_InFlightFences;
 
         vk::Buffer m_VertexBuffer;
+        vk::DeviceMemory m_VertexBufferMemory;
 
         bool m_FramebufferResized = false;
 
