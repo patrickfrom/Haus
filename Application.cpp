@@ -10,6 +10,12 @@
    see what's going on since I don't want to abstract
    Vulkan or GLFW until I understand them a little better*/
 namespace Haus {
+    struct UniformBufferObject {
+        glm::mat4 model;
+        glm::mat4 view;
+        glm::mat4 projection;
+    };
+
     struct Vertex {
         glm::vec2 Position;
         glm::vec3 Color;
@@ -150,11 +156,13 @@ namespace Haus {
         CreateSwapchain();
         CreateImageViews();
         CreateRenderPass();
+        CreateDescriptorSetLayout();
         CreateGraphicsPipeline();
         CreateFramebuffers();
         CreateCommandPool();
         CreateVertexBuffer();
         CreateIndexBuffer();
+        CreateUniformBuffers();
         CreateCommandBuffers();
         CreateSyncObjects();
     }
@@ -422,6 +430,23 @@ namespace Haus {
         return shaderModule;
     }
 
+    void Application::CreateDescriptorSetLayout() {
+        vk::DescriptorSetLayoutBinding uboLayoutBinding {
+            .binding = 0,
+            .descriptorType = vk::DescriptorType::eUniformBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eVertex
+        };
+
+        vk::DescriptorSetLayoutCreateInfo layoutInfo {
+            .bindingCount = 1,
+            .pBindings = &uboLayoutBinding
+        };
+
+        if (m_Device.createDescriptorSetLayout(&layoutInfo, nullptr, &m_DescriptorSetLayout) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to create descriptor set layout");
+    }
+
     void Application::CreateGraphicsPipeline() {
         auto vertexShaderCode = ReadFile("vert.spv");
         auto fragmentShaderCode = ReadFile("frag.spv");
@@ -504,7 +529,10 @@ namespace Haus {
                 .pAttachments = &colorBlendAttachment
         };
 
-        vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
+        vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
+            .setLayoutCount = 1,
+            .pSetLayouts = &m_DescriptorSetLayout
+        };
 
         if (m_Device.createPipelineLayout(&pipelineLayoutInfo, nullptr, &m_PipelineLayout) != vk::Result::eSuccess)
             throw std::runtime_error("Failed to create pipeline layout!");
@@ -642,6 +670,10 @@ namespace Haus {
         void* data = m_Device.mapMemory(m_IndexBufferMemory, 0, bufferInfo.size);
         memcpy(data, indices.data(), (size_t) bufferInfo.size);
         m_Device.unmapMemory(m_IndexBufferMemory);
+    }
+
+    void Application::CreateUniformBuffers() {
+        // TODO: This after I have added Staging Buffer
     }
 
     void Application::CreateCommandBuffers() {
@@ -784,6 +816,8 @@ namespace Haus {
 
     void Application::CleanupVulkan() {
         CleanupSwapchain();
+
+        m_Device.destroyDescriptorSetLayout(m_DescriptorSetLayout);
 
         m_Device.destroyBuffer(m_IndexBuffer);
         m_Device.freeMemory(m_IndexBufferMemory);

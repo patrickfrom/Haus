@@ -65,11 +65,13 @@ namespace Haus {
         void CreateSwapchain();
         void CreateImageViews();
         void CreateRenderPass();
+        void CreateDescriptorSetLayout();
         void CreateGraphicsPipeline();
         void CreateFramebuffers();
         void CreateCommandPool();
         void CreateVertexBuffer();
         void CreateIndexBuffer();
+        void CreateUniformBuffers();
         void CreateCommandBuffers();
         void CreateSyncObjects();
 
@@ -89,6 +91,7 @@ namespace Haus {
 
         vk::RenderPass m_RenderPass;
 
+        vk::DescriptorSetLayout m_DescriptorSetLayout;
         vk::PipelineLayout m_PipelineLayout;
         vk::Pipeline m_GraphicsPipeline;
 
@@ -104,6 +107,10 @@ namespace Haus {
 
         vk::Buffer m_IndexBuffer;
         vk::DeviceMemory m_IndexBufferMemory;
+
+        std::vector<vk::Buffer> m_UniformBuffers;
+        std::vector<vk::DeviceMemory> m_UniformBuffersMemory;
+        std::vector<void*> m_UniformBuffersMapped;
 
         vk::ClearValue m_ClearColor = {{{{0.0f, 0.0f, 0.0f, 1.0}}}};
 
