@@ -44,13 +44,13 @@ namespace Haus {
 
     // TODO: Later this will use Indices
     const std::vector<Vertex> vertices = {
-            {{0.5f,  -0.5f}, {1.0f, 0.0f, 0.0f}},
-            {{0.5f, 0.5f},  {1.0f, 0.32f, 0.32f}},
-            {{-0.5f,  0.5f},  {1.0f, 0.29f, 0.14f}},
+            {{0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}},
+            {{0.5f, -0.5f},  {1.0f, 0.32f, 0.32f}},
+            {{-0.5f,  -0.5f},  {1.0f, 0.29f, 0.14f}},
 
-            {{-0.5f,  0.5f},  {1.0f, 0.29f, 0.14f}},
-            {{-0.5f, -0.5f},  {1.0f, 0.32f, 0.32f}},
-            {{0.5f,  -0.5f}, {1.0f, 0.0f, 0.0f}}
+            {{-0.5f,  -0.5f},  {1.0f, 0.29f, 0.14f}},
+            {{-0.5f, 0.5f},  {1.0f, 0.32f, 0.32f}},
+            {{0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}},
     };
 
 #pragma region APPLICATION
@@ -140,7 +140,7 @@ namespace Haus {
                 .pEngineName = "No Engine",
                 .engineVersion = VK_MAKE_VERSION(1, 0, 0),
 
-                .apiVersion = VK_API_VERSION_1_2
+                .apiVersion = VK_API_VERSION_1_3
         };
 
         uint32_t glfwExtensionCount = 0;
@@ -641,9 +641,9 @@ namespace Haus {
 
         vk::Viewport viewport{
                 .x = 0.0f,
-                .y = 0.0f,
+                .y = (float) m_SwapchainExtent.height,
                 .width = (float) m_SwapchainExtent.width,
-                .height = (float) m_SwapchainExtent.height,
+                .height = -(float) m_SwapchainExtent.height,
                 .minDepth = 0.0f,
                 .maxDepth = 1.0f,
         };
