@@ -611,7 +611,6 @@ namespace Haus {
 
         //TODO Slowly understanding that we are using bitwise to check for example 1101 and 1001 then that will bet set if I am correct, still no idea
         for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
-            std::cout << to_string(memoryProperties.memoryTypes[i].propertyFlags) << std::endl;
             if (typeFilter & (1 << i) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
                 return i;
         }
