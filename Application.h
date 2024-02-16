@@ -1,9 +1,8 @@
 #pragma once
 
 #define VULKAN_HPP_NO_CONSTRUCTORS
-#include <vulkan/vulkan.hpp>
 
-#include <imgui.h>
+#include <vulkan/vulkan.hpp>
 #include <GLFW/glfw3.h>
 #include "glm/vec4.hpp"
 
@@ -22,26 +21,31 @@ namespace Haus {
 
     class Application {
     public:
-        explicit Application(ApplicationSpecification& specification);
+        explicit Application(ApplicationSpecification &specification);
 
         void Run();
+
         void Shutdown();
+
     private:
         ApplicationSpecification m_Specification;
 
         void Loop();
+
     private:
         void InitWindow();
+
         void CleanupGLFW();
 
-        static void FramebufferResizeCallback(GLFWwindow* window, int width, int height);
+        static void FramebufferResizeCallback(GLFWwindow *window, int width, int height);
 
-        GLFWwindow* m_Window;
+        GLFWwindow *m_Window;
 
     public:
         void SetClearColor(glm::vec4 color) {
             m_ClearColor = {{{{color.x, color.y, color.z, color.w}}}};
         }
+
     private:
         const int MAX_FRAMES_IN_FLIGHT = 2;
         uint32_t m_CurrentFrame = 0;
@@ -49,35 +53,62 @@ namespace Haus {
         uint32_t m_MinImageCount;
 
         SwapChainSupportDetails QuerySwapChainSupport(vk::PhysicalDevice device);
-        vk::ShaderModule CreateShaderModule(const std::vector<char>& code);
+
+        vk::ShaderModule CreateShaderModule(const std::vector<char> &code);
+
         void RecordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex);
+
         void DrawFrame();
+
         void UpdateUniformBuffer(uint32_t currentImage);
+
         uint32_t FindMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
-        void CreateBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Buffer& buffer, vk::DeviceMemory& bufferMemory);
+
+        void CreateBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties,
+                          vk::Buffer &buffer, vk::DeviceMemory &bufferMemory);
+
         void CopyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size);
 
         void CleanupSwapchain();
+
         void RecreateSwapchain();
 
         void InitVulkan();
+
         void CreateInstance();
+
         void CreateSurface();
+
         void PickPhysicalDevice();
+
         void CreateLogicalDevice();
+
         void CreateSwapchain();
+
         void CreateImageViews();
+
         void CreateRenderPass();
+
         void CreateDescriptorSetLayout();
+
         void CreateGraphicsPipeline();
+
         void CreateFramebuffers();
+
         void CreateCommandPool();
+
         void CreateVertexBuffer();
+
         void CreateIndexBuffer();
+
         void CreateUniformBuffers();
+
         void CreateDescriptorPool();
+
         void CreateDescriptorSets();
+
         void CreateCommandBuffers();
+
         void CreateSyncObjects();
 
         void CleanupVulkan();
@@ -115,7 +146,7 @@ namespace Haus {
 
         std::vector<vk::Buffer> m_UniformBuffers;
         std::vector<vk::DeviceMemory> m_UniformBuffersMemory;
-        std::vector<void*> m_UniformBuffersMapped;
+        std::vector<void *> m_UniformBuffersMapped;
 
         vk::DescriptorPool m_DescriptorPool;
         std::vector<vk::DescriptorSet> m_DescriptorSets;

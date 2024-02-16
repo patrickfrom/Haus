@@ -1,6 +1,4 @@
 #include "Application.h"
-#include "imgui_impl_vulkan.h"
-#include "imgui_impl_glfw.h"
 #include <iostream>
 #include <format>
 #include <fstream>
@@ -76,29 +74,6 @@ namespace Haus {
 
         InitWindow();
         InitVulkan();
-
-        // TODO: Setup ImGui Later
-        /*IMGUI_CHECKVERSION();
-        ImGui::CreateContext();
-        ImGuiIO& io = ImGui::GetIO(); (void)io;
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-
-        ImGui::StyleColorsDark();
-
-        ImGui_ImplVulkan_InitInfo initInfo = {
-                .Instance = m_Instance,
-                .PhysicalDevice = m_PhysicalDevice,
-                .Device = m_Device,
-                .Queue = m_GraphicsQueue,
-                .RenderPass = m_RenderPass,
-                .MinImageCount = m_MinImageCount,
-                .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
-                .Subpass = 0,
-        };
-        ImGui_ImplVulkan_Init(&initInfo);*/
-
         Loop();
     }
 
@@ -923,17 +898,22 @@ namespace Haus {
         m_CurrentFrame = (m_CurrentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
+
     void Application::UpdateUniformBuffer(uint32_t currentImage) {
         static auto startTime = std::chrono::high_resolution_clock::now();
 
         auto currentTime = std::chrono::high_resolution_clock::now();
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
+        glm::vec3 cameraPosition = glm::vec3(glm::cos(time * 0.5f), glm::sin(time * 0.5f), 3.0f + glm::cos(time * 0.25f));
         UniformBufferObject uniformBufferObject{
                 .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-                .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+                .view = glm::lookAt(cameraPosition,
+                                    cameraPosition + glm::vec3(0.0f, 0.0f, -1.0f),
+                                    glm::vec3(0.0f, 1.0f, 0.0f)),
                 .projection = glm::perspective(glm::radians(45.0f),
-                                               (float) m_SwapchainExtent.width / (float) m_SwapchainExtent.height, 0.1f, 10.0f),
+                                               (float) m_SwapchainExtent.width / (float) m_SwapchainExtent.height, 0.1f,
+                                               10.0f),
         };
 
         memcpy(m_UniformBuffersMapped[currentImage], &uniformBufferObject, sizeof(uniformBufferObject));
