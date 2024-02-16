@@ -52,6 +52,7 @@ namespace Haus {
         vk::ShaderModule CreateShaderModule(const std::vector<char>& code);
         void RecordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex);
         void DrawFrame();
+        void UpdateUniformBuffer(uint32_t currentImage);
         uint32_t FindMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
         void CreateBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Buffer& buffer, vk::DeviceMemory& bufferMemory);
         void CopyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size);
@@ -74,6 +75,8 @@ namespace Haus {
         void CreateVertexBuffer();
         void CreateIndexBuffer();
         void CreateUniformBuffers();
+        void CreateDescriptorPool();
+        void CreateDescriptorSets();
         void CreateCommandBuffers();
         void CreateSyncObjects();
 
@@ -113,6 +116,9 @@ namespace Haus {
         std::vector<vk::Buffer> m_UniformBuffers;
         std::vector<vk::DeviceMemory> m_UniformBuffersMemory;
         std::vector<void*> m_UniformBuffersMapped;
+
+        vk::DescriptorPool m_DescriptorPool;
+        std::vector<vk::DescriptorSet> m_DescriptorSets;
 
         vk::ClearValue m_ClearColor = {{{{0.0f, 0.0f, 0.0f, 1.0}}}};
 

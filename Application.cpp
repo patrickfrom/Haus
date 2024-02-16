@@ -4,7 +4,12 @@
 #include <iostream>
 #include <format>
 #include <fstream>
+#include <chrono>
+
+#define GLM_FORCE_RADIANS
+
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 /* Currently using regions, just so it's easier for me to
    see what's going on since I don't want to abstract
@@ -163,6 +168,8 @@ namespace Haus {
         CreateVertexBuffer();
         CreateIndexBuffer();
         CreateUniformBuffers();
+        CreateDescriptorPool();
+        CreateDescriptorSets();
         CreateCommandBuffers();
         CreateSyncObjects();
     }
@@ -703,7 +710,8 @@ namespace Haus {
         memcpy(data, indices.data(), (size_t) bufferSize);
         m_Device.unmapMemory(stagingBufferMemory);
 
-        CreateBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, m_IndexBuffer, m_IndexBufferMemory);
+        CreateBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer,
+                     vk::MemoryPropertyFlagBits::eDeviceLocal, m_IndexBuffer, m_IndexBufferMemory);
 
         CopyBuffer(stagingBuffer, m_IndexBuffer, bufferSize);
         m_Device.destroyBuffer(stagingBuffer);
@@ -718,9 +726,60 @@ namespace Haus {
         m_UniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            CreateBuffer(bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, m_UniformBuffers[i], m_UniformBuffersMemory[i]);
+            CreateBuffer(bufferSize, vk::BufferUsageFlagBits::eUniformBuffer,
+                         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                         m_UniformBuffers[i], m_UniformBuffersMemory[i]);
 
             m_UniformBuffersMapped[i] = m_Device.mapMemory(m_UniformBuffersMemory[i], 0, bufferSize);
+        }
+    }
+
+    void Application::CreateDescriptorPool() {
+        vk::DescriptorPoolSize poolSize{
+                .type = vk::DescriptorType::eUniformBuffer,
+                .descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
+        };
+
+        vk::DescriptorPoolCreateInfo poolInfo{
+                .maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
+                .poolSizeCount = 1,
+                .pPoolSizes = &poolSize,
+        };
+
+        if (m_Device.createDescriptorPool(&poolInfo, nullptr, &m_DescriptorPool) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to create descriptor pool");
+    }
+
+    void Application::CreateDescriptorSets() {
+        std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, m_DescriptorSetLayout);
+
+        vk::DescriptorSetAllocateInfo allocateInfo{
+                .descriptorPool = m_DescriptorPool,
+                .descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
+                .pSetLayouts = layouts.data()
+        };
+
+        m_DescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+        if (m_Device.allocateDescriptorSets(&allocateInfo, m_DescriptorSets.data()) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to allocate descriptor sets");
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vk::DescriptorBufferInfo bufferInfo{
+                    .buffer = m_UniformBuffers[i],
+                    .offset = 0,
+                    .range = sizeof(UniformBufferObject)
+            };
+
+            vk::WriteDescriptorSet descriptorWrite{
+                    .dstSet = m_DescriptorSets[i],
+                    .dstBinding = 0,
+                    .dstArrayElement = 0,
+                    .descriptorCount = 1,
+                    .descriptorType = vk::DescriptorType::eUniformBuffer,
+                    .pBufferInfo = &bufferInfo
+            };
+
+            m_Device.updateDescriptorSets(1, &descriptorWrite, 0, nullptr);
         }
     }
 
@@ -800,6 +859,8 @@ namespace Haus {
         commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
         commandBuffer.bindIndexBuffer(m_IndexBuffer, 0, vk::IndexType::eUint16);
 
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_PipelineLayout, 0, 1,
+                                         &m_DescriptorSets[m_CurrentFrame], 0, nullptr);
         commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
         commandBuffer.endRenderPass();
@@ -820,11 +881,12 @@ namespace Haus {
         } else if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
             throw std::runtime_error("Failed to acquire swap chain image");
 
+        UpdateUniformBuffer(m_CurrentFrame);
+
         m_Device.resetFences(1, &m_InFlightFences[m_CurrentFrame]);
 
         m_CommandBuffers[m_CurrentFrame].reset();
         RecordCommandBuffer(m_CommandBuffers[m_CurrentFrame], imageIndex);
-
 
         vk::Semaphore waitSemaphores[] = {m_ImageAvailableSemaphores[m_CurrentFrame]};
         vk::Semaphore signalSemaphores[] = {m_RenderFinishedSemaphores[m_CurrentFrame]};
@@ -862,6 +924,22 @@ namespace Haus {
         m_CurrentFrame = (m_CurrentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
+    void Application::UpdateUniformBuffer(uint32_t currentImage) {
+        static auto startTime = std::chrono::high_resolution_clock::now();
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+        UniformBufferObject uniformBufferObject{
+                .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+                .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+                .projection = glm::perspective(glm::radians(45.0f),
+                                               (float) m_SwapchainExtent.width / (float) m_SwapchainExtent.height, 0.1f, 10.0f),
+        };
+
+        memcpy(m_UniformBuffersMapped[currentImage], &uniformBufferObject, sizeof(uniformBufferObject));
+    }
+
     void Application::CleanupVulkan() {
         CleanupSwapchain();
 
@@ -870,6 +948,7 @@ namespace Haus {
             m_Device.freeMemory(m_UniformBuffersMemory[i]);
         }
 
+        m_Device.destroyDescriptorPool(m_DescriptorPool);
         m_Device.destroyDescriptorSetLayout(m_DescriptorSetLayout);
 
         m_Device.destroyBuffer(m_IndexBuffer);
