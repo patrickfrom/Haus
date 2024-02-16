@@ -53,6 +53,8 @@ namespace Haus {
         void RecordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex);
         void DrawFrame();
         uint32_t FindMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
+        void CreateBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Buffer& buffer, vk::DeviceMemory& bufferMemory);
+        void CopyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size);
 
         void CleanupSwapchain();
         void RecreateSwapchain();

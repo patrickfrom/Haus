@@ -431,16 +431,16 @@ namespace Haus {
     }
 
     void Application::CreateDescriptorSetLayout() {
-        vk::DescriptorSetLayoutBinding uboLayoutBinding {
-            .binding = 0,
-            .descriptorType = vk::DescriptorType::eUniformBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eVertex
+        vk::DescriptorSetLayoutBinding uboLayoutBinding{
+                .binding = 0,
+                .descriptorType = vk::DescriptorType::eUniformBuffer,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eVertex
         };
 
-        vk::DescriptorSetLayoutCreateInfo layoutInfo {
-            .bindingCount = 1,
-            .pBindings = &uboLayoutBinding
+        vk::DescriptorSetLayoutCreateInfo layoutInfo{
+                .bindingCount = 1,
+                .pBindings = &uboLayoutBinding
         };
 
         if (m_Device.createDescriptorSetLayout(&layoutInfo, nullptr, &m_DescriptorSetLayout) != vk::Result::eSuccess)
@@ -530,8 +530,8 @@ namespace Haus {
         };
 
         vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
-            .setLayoutCount = 1,
-            .pSetLayouts = &m_DescriptorSetLayout
+                .setLayoutCount = 1,
+                .pSetLayouts = &m_DescriptorSetLayout
         };
 
         if (m_Device.createPipelineLayout(&pipelineLayoutInfo, nullptr, &m_PipelineLayout) != vk::Result::eSuccess)
@@ -602,7 +602,7 @@ namespace Haus {
     uint32_t Application::FindMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
         vk::PhysicalDeviceMemoryProperties memoryProperties = m_PhysicalDevice.getMemoryProperties();
 
-        //TODO No idea how this works yet tbh, my brain can't wrap around it so take a deeper look into this later on
+        //TODO Slowly understanding that we are using bitwise to check for example 1101 and 1001 then that will bet set if I am correct, still no idea
         for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
             std::cout << to_string(memoryProperties.memoryTypes[i].propertyFlags) << std::endl;
             if (typeFilter & (1 << i) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
@@ -612,64 +612,102 @@ namespace Haus {
         throw std::runtime_error("Failed to find suitable memory type");
     }
 
-
-    // TODO: Look into Staging Buffer https://vulkan-tutorial.com/Vertex_buffers/Staging_buffer
-    void Application::CreateVertexBuffer() {
+    void Application::CreateBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties,
+                                   vk::Buffer &buffer, vk::DeviceMemory &bufferMemory) {
         vk::BufferCreateInfo bufferInfo{
-                .size = sizeof(vertices[0]) * vertices.size(),
-                .usage = vk::BufferUsageFlagBits::eVertexBuffer,
+                .size = size,
+                .usage = usage,
                 .sharingMode = vk::SharingMode::eExclusive
         };
 
-        if (m_Device.createBuffer(&bufferInfo, nullptr, &m_VertexBuffer) != vk::Result::eSuccess)
-            throw std::runtime_error("Failed to create vertex buffer");
+        if (m_Device.createBuffer(&bufferInfo, nullptr, &buffer) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to create buffer");
 
-        vk::MemoryRequirements memoryRequirements = m_Device.getBufferMemoryRequirements(m_VertexBuffer);
+        vk::MemoryRequirements memoryRequirements = m_Device.getBufferMemoryRequirements(buffer);
 
         vk::MemoryAllocateInfo allocateInfo{
                 .allocationSize = memoryRequirements.size,
-                .memoryTypeIndex = FindMemoryType(memoryRequirements.memoryTypeBits,
-                                                  vk::MemoryPropertyFlagBits::eHostVisible |
-                                                  vk::MemoryPropertyFlagBits::eHostCoherent),
+                .memoryTypeIndex = FindMemoryType(memoryRequirements.memoryTypeBits, properties)
         };
 
-        if (m_Device.allocateMemory(&allocateInfo, nullptr, &m_VertexBufferMemory) != vk::Result::eSuccess)
-            throw std::runtime_error("Failed to allocate vertex buffer memory!");
+        if (m_Device.allocateMemory(&allocateInfo, nullptr, &bufferMemory) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to allocate buffer memory");
 
-        m_Device.bindBufferMemory(m_VertexBuffer, m_VertexBufferMemory, 0);
+        m_Device.bindBufferMemory(buffer, bufferMemory, 0);
+    }
 
-        void *data = m_Device.mapMemory(m_VertexBufferMemory, 0, bufferInfo.size);
-        memcpy(data, vertices.data(), (size_t) bufferInfo.size);
-        m_Device.unmapMemory(m_VertexBufferMemory);
+    void Application::CopyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size) {
+        vk::CommandBufferAllocateInfo allocateInfo{
+                .commandPool = m_CommandPool,
+                .level = vk::CommandBufferLevel::ePrimary,
+                .commandBufferCount = 1,
+        };
+
+        vk::CommandBuffer commandBuffer;
+        if (m_Device.allocateCommandBuffers(&allocateInfo, &commandBuffer) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to allocate command buffers");
+
+        vk::CommandBufferBeginInfo beginInfo{
+                .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
+        };
+
+        commandBuffer.begin(&beginInfo);
+
+        vk::BufferCopy copyRegion{
+                .size = size
+        };
+        commandBuffer.copyBuffer(srcBuffer, dstBuffer, 1, &copyRegion);
+        commandBuffer.end();
+
+        vk::SubmitInfo submitInfo{
+                .commandBufferCount = 1,
+                .pCommandBuffers = &commandBuffer
+        };
+
+        m_GraphicsQueue.submit(1, &submitInfo, VK_NULL_HANDLE);
+        m_GraphicsQueue.waitIdle();
+        m_Device.freeCommandBuffers(m_CommandPool, 1, &commandBuffer);
+    }
+
+    void Application::CreateVertexBuffer() {
+        vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+        CreateBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc,
+                     vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                     stagingBuffer, stagingBufferMemory);
+
+        void *data = m_Device.mapMemory(stagingBufferMemory, 0, bufferSize);
+        memcpy(data, vertices.data(), (size_t) bufferSize);
+        m_Device.unmapMemory(stagingBufferMemory);
+
+        CreateBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer,
+                     vk::MemoryPropertyFlagBits::eDeviceLocal, m_VertexBuffer, m_VertexBufferMemory);
+
+        CopyBuffer(stagingBuffer, m_VertexBuffer, bufferSize);
+        m_Device.destroyBuffer(stagingBuffer);
+        m_Device.freeMemory(stagingBufferMemory);
     }
 
     void Application::CreateIndexBuffer() {
-        vk::BufferCreateInfo bufferInfo{
-                .size = sizeof(indices[0]) * indices.size(),
-                .usage = vk::BufferUsageFlagBits::eIndexBuffer,
-                .sharingMode = vk::SharingMode::eExclusive
-        };
+        vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
-        if (m_Device.createBuffer(&bufferInfo, nullptr, &m_IndexBuffer) != vk::Result::eSuccess)
-            throw std::runtime_error("Failed to create index buffer");
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+        CreateBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc,
+                     vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                     stagingBuffer, stagingBufferMemory);
 
-        vk::MemoryRequirements memoryRequirements = m_Device.getBufferMemoryRequirements(m_IndexBuffer);
+        void *data = m_Device.mapMemory(stagingBufferMemory, 0, bufferSize);
+        memcpy(data, indices.data(), (size_t) bufferSize);
+        m_Device.unmapMemory(stagingBufferMemory);
 
-        vk::MemoryAllocateInfo allocateInfo{
-                .allocationSize = memoryRequirements.size,
-                .memoryTypeIndex = FindMemoryType(memoryRequirements.memoryTypeBits,
-                                                  vk::MemoryPropertyFlagBits::eHostVisible |
-                                                  vk::MemoryPropertyFlagBits::eHostCoherent)
-        };
+        CreateBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, m_IndexBuffer, m_IndexBufferMemory);
 
-        if (m_Device.allocateMemory(&allocateInfo, nullptr, &m_IndexBufferMemory) != vk::Result::eSuccess)
-            throw std::runtime_error("Failed to allocate index buffer memory");
-
-        m_Device.bindBufferMemory(m_IndexBuffer, m_IndexBufferMemory, 0);
-
-        void* data = m_Device.mapMemory(m_IndexBufferMemory, 0, bufferInfo.size);
-        memcpy(data, indices.data(), (size_t) bufferInfo.size);
-        m_Device.unmapMemory(m_IndexBufferMemory);
+        CopyBuffer(stagingBuffer, m_IndexBuffer, bufferSize);
+        m_Device.destroyBuffer(stagingBuffer);
+        m_Device.freeMemory(stagingBufferMemory);
     }
 
     void Application::CreateUniformBuffers() {
