@@ -711,7 +711,17 @@ namespace Haus {
     }
 
     void Application::CreateUniformBuffers() {
-        // TODO: This after I have added Staging Buffer
+        vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
+
+        m_UniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        m_UniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+        m_UniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            CreateBuffer(bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, m_UniformBuffers[i], m_UniformBuffersMemory[i]);
+
+            m_UniformBuffersMapped[i] = m_Device.mapMemory(m_UniformBuffersMemory[i], 0, bufferSize);
+        }
     }
 
     void Application::CreateCommandBuffers() {
@@ -854,6 +864,11 @@ namespace Haus {
 
     void Application::CleanupVulkan() {
         CleanupSwapchain();
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            m_Device.destroyBuffer(m_UniformBuffers[i]);
+            m_Device.freeMemory(m_UniformBuffersMemory[i]);
+        }
 
         m_Device.destroyDescriptorSetLayout(m_DescriptorSetLayout);
 
