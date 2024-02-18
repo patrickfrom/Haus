@@ -69,6 +69,10 @@ namespace Haus {
 
         void CopyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size);
 
+        void CreateImage(uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling,
+                         vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Image &image,
+                         vk::DeviceMemory &imageMemory);
+
         void CleanupSwapchain();
 
         void RecreateSwapchain();
@@ -96,6 +100,8 @@ namespace Haus {
         void CreateFramebuffers();
 
         void CreateCommandPool();
+
+        void CreateTextureImage();
 
         void CreateVertexBuffer();
 
@@ -150,6 +156,9 @@ namespace Haus {
 
         vk::DescriptorPool m_DescriptorPool;
         std::vector<vk::DescriptorSet> m_DescriptorSets;
+
+        vk::Image m_CatImage;
+        vk::DeviceMemory m_CatImageMemory;
 
         vk::ClearValue m_ClearColor = {{{{0.0f, 0.0f, 0.0f, 1.0}}}};
 

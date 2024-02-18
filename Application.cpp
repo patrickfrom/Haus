@@ -9,6 +9,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#define STB_IMAGE_IMPLEMENTATION
+
+#include <stb/image.h>
+
 /* Currently using regions, just so it's easier for me to
    see what's going on since I don't want to abstract
    Vulkan or GLFW until I understand them a little better*/
@@ -140,6 +144,7 @@ namespace Haus {
         CreateGraphicsPipeline();
         CreateFramebuffers();
         CreateCommandPool();
+        CreateTextureImage();
         CreateVertexBuffer();
         CreateIndexBuffer();
         CreateUniformBuffers();
@@ -581,6 +586,69 @@ namespace Haus {
             throw std::runtime_error("Failed to create command pool");
     }
 
+    void Application::CreateImage(uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling,
+                                  vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Image &image,
+                                  vk::DeviceMemory &imageMemory) {
+        vk::ImageCreateInfo imageInfo{
+                .imageType = vk::ImageType::e2D,
+                .format = format,
+                .extent {
+                        .width = static_cast<uint32_t>(width),
+                        .height = static_cast<uint32_t>(height),
+                        .depth = 1
+                },
+                .mipLevels = 1,
+                .arrayLayers = 1,
+                .samples = vk::SampleCountFlagBits::e1,
+                .tiling = tiling,
+                .usage = usage,
+                .sharingMode = vk::SharingMode::eExclusive,
+                .initialLayout = vk::ImageLayout::eUndefined,
+        };
+
+        if (m_Device.createImage(&imageInfo, nullptr, &image) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to create image");
+
+        vk::MemoryRequirements memoryRequirements = m_Device.getImageMemoryRequirements(image);
+
+        vk::MemoryAllocateInfo allocateInfo{
+                .allocationSize = memoryRequirements.size,
+                .memoryTypeIndex = FindMemoryType(memoryRequirements.memoryTypeBits,
+                                                  properties)
+        };
+
+        if (m_Device.allocateMemory(&allocateInfo, nullptr, &imageMemory) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to allocate image memory");
+
+        m_Device.bindImageMemory(image, imageMemory, 0);
+    }
+
+    void Application::CreateTextureImage() {
+        int width, height, channels;
+        stbi_uc *pixels = stbi_load("textures/cat.png", &width, &height, &channels, STBI_rgb_alpha);
+        vk::DeviceSize imageSize = width * height * 4;
+
+        if (!pixels)
+            throw std::runtime_error("Failed to load texture image");
+
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+
+        CreateBuffer(imageSize, vk::BufferUsageFlagBits::eTransferSrc,
+                     vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                     stagingBuffer, stagingBufferMemory);
+
+        void *data = m_Device.mapMemory(stagingBufferMemory, 0, imageSize);
+        memcpy(data, pixels, static_cast<size_t>(imageSize));
+        m_Device.unmapMemory(stagingBufferMemory);
+
+        stbi_image_free(pixels);
+
+        CreateImage(width, height, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal,
+                    vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+                    vk::MemoryPropertyFlagBits::eDeviceLocal, m_CatImage, m_CatImageMemory);
+    }
+
     uint32_t Application::FindMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
         vk::PhysicalDeviceMemoryProperties memoryProperties = m_PhysicalDevice.getMemoryProperties();
 
@@ -905,11 +973,10 @@ namespace Haus {
         auto currentTime = std::chrono::high_resolution_clock::now();
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
-        glm::vec3 cameraPosition = glm::vec3(glm::cos(time * 0.5f), glm::sin(time * 0.5f), 3.0f + glm::cos(time * 0.25f));
         UniformBufferObject uniformBufferObject{
                 .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-                .view = glm::lookAt(cameraPosition,
-                                    cameraPosition + glm::vec3(0.0f, 0.0f, -1.0f),
+                .view = glm::lookAt(glm::vec3(0.0f, -2.5f, 2.0f),
+                                    glm::vec3(0.0f, 0.0f, 0.0f),
                                     glm::vec3(0.0f, 1.0f, 0.0f)),
                 .projection = glm::perspective(glm::radians(45.0f),
                                                (float) m_SwapchainExtent.width / (float) m_SwapchainExtent.height, 0.1f,
@@ -929,6 +996,9 @@ namespace Haus {
 
         m_Device.destroyDescriptorPool(m_DescriptorPool);
         m_Device.destroyDescriptorSetLayout(m_DescriptorSetLayout);
+
+        m_Device.destroyImage(m_CatImage);
+        m_Device.freeMemory(m_CatImageMemory);
 
         m_Device.destroyBuffer(m_IndexBuffer);
         m_Device.freeMemory(m_IndexBufferMemory);
