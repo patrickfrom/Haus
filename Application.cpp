@@ -253,12 +253,20 @@ namespace Haus {
 
     void Application::CreateSwapchain() {
         SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport(m_PhysicalDevice);
-        int width, height;
-        glfwGetFramebufferSize(m_Window, &width, &height);
-        vk::Extent2D extent{
-                .width = static_cast<uint32_t>(width),
-                .height = static_cast<uint32_t>(height)
-        };
+
+        vk::Extent2D extent{};
+        if (swapChainSupport.Capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+            extent = swapChainSupport.Capabilities.currentExtent;
+        } else {
+            int width, height;
+            glfwGetFramebufferSize(m_Window, &width, &height);
+
+            extent.width = width;
+            extent.height = height;
+
+            extent.width = std::clamp(extent.width, swapChainSupport.Capabilities.minImageExtent.width, swapChainSupport.Capabilities.maxImageExtent.width);
+            extent.height = std::clamp(extent.height, swapChainSupport.Capabilities.minImageExtent.height, swapChainSupport.Capabilities.maxImageExtent.height);
+        }
 
         uint32_t imageCount = swapChainSupport.Capabilities.minImageCount + 1;
         if (swapChainSupport.Capabilities.maxImageCount > 0 && imageCount > swapChainSupport.Capabilities.maxImageCount)
@@ -718,7 +726,6 @@ namespace Haus {
 
     void Application::TransitionImageLayout(vk::Image image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout) {
         vk::CommandBuffer commandBuffer = BeginSingleTimeCommands();
-
 
         vk::ImageMemoryBarrier barrier{
             .oldLayout = oldLayout,
