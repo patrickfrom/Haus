@@ -586,6 +586,66 @@ namespace Haus {
             throw std::runtime_error("Failed to create command pool");
     }
 
+    vk::CommandBuffer Application::BeginSingleTimeCommands() {
+        vk::CommandBufferAllocateInfo allocateInfo{
+            .commandPool = m_CommandPool,
+            .level = vk::CommandBufferLevel::ePrimary,
+            .commandBufferCount = 1
+        };
+
+        vk::CommandBuffer commandBuffer;
+        if (m_Device.allocateCommandBuffers(&allocateInfo, &commandBuffer) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to allocate command buffers");
+
+        vk::CommandBufferBeginInfo beginInfo{
+            .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
+        };
+
+        commandBuffer.begin(beginInfo);
+
+        return commandBuffer;
+    }
+
+    void Application::EndSingleTimeCommands(vk::CommandBuffer commandBuffer) {
+        commandBuffer.end();
+
+        vk::SubmitInfo submitInfo{
+            .commandBufferCount = 1,
+            .pCommandBuffers = &commandBuffer
+        };
+
+        m_GraphicsQueue.submit(1, &submitInfo, VK_NULL_HANDLE);
+        m_GraphicsQueue.waitIdle();
+
+        m_Device.freeCommandBuffers(m_CommandPool, 1, &commandBuffer);
+    }
+
+    void Application::CopyBufferToImage(vk::Buffer buffer, vk::Image image, uint32_t width, uint32_t height) {
+        vk::CommandBuffer commandBuffer = BeginSingleTimeCommands();
+
+        vk::BufferImageCopy region{
+            .bufferOffset = 0,
+            .bufferRowLength = 0,
+            .bufferImageHeight = 0,
+            .imageSubresource {
+                .aspectMask = vk::ImageAspectFlagBits::eColor,
+                .mipLevel = 0,
+                .baseArrayLayer = 0,
+                .layerCount = 1
+            },
+            .imageOffset {0, 0, 0},
+            .imageExtent {
+                .width = width,
+                .height = height,
+                .depth = 1
+            }
+        };
+
+        commandBuffer.copyBufferToImage(buffer, image, vk::ImageLayout::eTransferDstOptimal, 1, &region);
+
+        EndSingleTimeCommands(commandBuffer);
+    }
+
     void Application::CreateImage(uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling,
                                   vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Image &image,
                                   vk::DeviceMemory &imageMemory) {
@@ -647,6 +707,62 @@ namespace Haus {
         CreateImage(width, height, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal,
                     vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
                     vk::MemoryPropertyFlagBits::eDeviceLocal, m_CatImage, m_CatImageMemory);
+
+        TransitionImageLayout(m_CatImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+        CopyBufferToImage(stagingBuffer, m_CatImage, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+        TransitionImageLayout(m_CatImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+
+        m_Device.destroyBuffer(stagingBuffer);
+        m_Device.freeMemory(stagingBufferMemory);
+    }
+
+    void Application::TransitionImageLayout(vk::Image image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout) {
+        vk::CommandBuffer commandBuffer = BeginSingleTimeCommands();
+
+
+        vk::ImageMemoryBarrier barrier{
+            .oldLayout = oldLayout,
+            .newLayout = newLayout,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = image,
+            .subresourceRange {
+                .aspectMask = vk::ImageAspectFlagBits::eColor,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1
+            },
+        };
+
+        vk::PipelineStageFlags sourceStage;
+        vk::PipelineStageFlags destinationStage;
+
+        if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eTransferDstOptimal) {
+            barrier.srcAccessMask = vk::AccessFlagBits::eNone;
+            barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+
+            sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
+            destinationStage = vk::PipelineStageFlagBits::eTransfer;
+        } else if (oldLayout == vk::ImageLayout::eTransferDstOptimal && newLayout == vk::ImageLayout::eShaderReadOnlyOptimal) {
+            barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+            barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+
+            sourceStage = vk::PipelineStageFlagBits::eTransfer;
+            destinationStage = vk::PipelineStageFlagBits::eFragmentShader;
+        } else {
+            throw std::invalid_argument("Unsupported layout transition!");
+        }
+
+        commandBuffer.pipelineBarrier(
+                sourceStage, destinationStage,
+                vk::DependencyFlagBits::eByRegion,
+                0, nullptr,
+                0, nullptr,
+                1, &barrier
+                );
+
+        EndSingleTimeCommands(commandBuffer);
     }
 
     uint32_t Application::FindMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
@@ -686,36 +802,14 @@ namespace Haus {
     }
 
     void Application::CopyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size) {
-        vk::CommandBufferAllocateInfo allocateInfo{
-                .commandPool = m_CommandPool,
-                .level = vk::CommandBufferLevel::ePrimary,
-                .commandBufferCount = 1,
-        };
-
-        vk::CommandBuffer commandBuffer;
-        if (m_Device.allocateCommandBuffers(&allocateInfo, &commandBuffer) != vk::Result::eSuccess)
-            throw std::runtime_error("Failed to allocate command buffers");
-
-        vk::CommandBufferBeginInfo beginInfo{
-                .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
-        };
-
-        commandBuffer.begin(&beginInfo);
+        vk::CommandBuffer commandBuffer = BeginSingleTimeCommands();
 
         vk::BufferCopy copyRegion{
                 .size = size
         };
         commandBuffer.copyBuffer(srcBuffer, dstBuffer, 1, &copyRegion);
-        commandBuffer.end();
 
-        vk::SubmitInfo submitInfo{
-                .commandBufferCount = 1,
-                .pCommandBuffers = &commandBuffer
-        };
-
-        m_GraphicsQueue.submit(1, &submitInfo, VK_NULL_HANDLE);
-        m_GraphicsQueue.waitIdle();
-        m_Device.freeCommandBuffers(m_CommandPool, 1, &commandBuffer);
+        EndSingleTimeCommands(commandBuffer);
     }
 
     void Application::CreateVertexBuffer() {

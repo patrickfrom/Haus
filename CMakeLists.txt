@@ -19,4 +19,4 @@ add_subdirectory(vendors/stb)
 find_package(Vulkan REQUIRED)
 
 
-target_link_libraries(Haus PRIVATE Vulkan::Vulkan glfw glm::glm stb -static)
+target_link_libraries(Haus PRIVATE Vulkan::Vulkan glfw glm::glm stb)
