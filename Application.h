@@ -104,6 +104,7 @@ namespace Haus {
         void CreateDescriptorSetLayout();
 
         void CreateGraphicsPipeline();
+        void CreateWireframePipeline(vk::GraphicsPipelineCreateInfo& pipelineInfo, vk::PipelineRasterizationStateCreateInfo& rasterizer);
 
         void CreateFramebuffers();
 
@@ -144,6 +145,7 @@ namespace Haus {
         vk::DescriptorSetLayout m_DescriptorSetLayout;
         vk::PipelineLayout m_PipelineLayout;
         vk::Pipeline m_GraphicsPipeline;
+        vk::Pipeline m_WireframePipeline;
 
         vk::CommandPool m_CommandPool;
         std::vector<vk::CommandBuffer> m_CommandBuffers;

@@ -220,9 +220,11 @@ namespace Haus {
                 .pQueuePriorities = &priority,
         };
 
-        vk::PhysicalDeviceFeatures deviceFeatures{};
+        vk::PhysicalDeviceFeatures deviceFeatures{
+            .fillModeNonSolid = vk::True
+        };
 
-        std::array<const char *, 1> enabledExtensions = {"VK_KHR_swapchain"};
+        std::vector<const char *> enabledExtensions = {"VK_KHR_swapchain"};
 
         vk::DeviceCreateInfo createInfo{
                 .queueCreateInfoCount = 1,
@@ -264,8 +266,10 @@ namespace Haus {
             extent.width = width;
             extent.height = height;
 
-            extent.width = std::clamp(extent.width, swapChainSupport.Capabilities.minImageExtent.width, swapChainSupport.Capabilities.maxImageExtent.width);
-            extent.height = std::clamp(extent.height, swapChainSupport.Capabilities.minImageExtent.height, swapChainSupport.Capabilities.maxImageExtent.height);
+            extent.width = std::clamp(extent.width, swapChainSupport.Capabilities.minImageExtent.width,
+                                      swapChainSupport.Capabilities.maxImageExtent.width);
+            extent.height = std::clamp(extent.height, swapChainSupport.Capabilities.minImageExtent.height,
+                                       swapChainSupport.Capabilities.maxImageExtent.height);
         }
 
         uint32_t imageCount = swapChainSupport.Capabilities.minImageCount + 1;
@@ -466,7 +470,7 @@ namespace Haus {
                 fragmentShaderStageInfo
         };
 
-        std::array<vk::DynamicState, 2> dynamicStates = {
+        std::vector<vk::DynamicState> dynamicStates = {
                 vk::DynamicState::eViewport,
                 vk::DynamicState::eScissor
         };
@@ -503,7 +507,7 @@ namespace Haus {
                 .cullMode = vk::CullModeFlagBits::eBack,
                 .frontFace = vk::FrontFace::eClockwise,
                 .depthBiasEnable = VK_FALSE,
-                .lineWidth = 1.0f,
+                .lineWidth = 1.0f
         };
 
         vk::PipelineMultisampleStateCreateInfo multisampling{
@@ -533,6 +537,7 @@ namespace Haus {
             throw std::runtime_error("Failed to create pipeline layout!");
 
         vk::GraphicsPipelineCreateInfo pipelineInfo{
+                .flags = vk::PipelineCreateFlagBits::eAllowDerivatives,
                 .stageCount = static_cast<uint32_t>(shaderStages.size()),
                 .pStages = shaderStages.data(),
                 .pVertexInputState = &vertexInputInfo,
@@ -544,21 +549,29 @@ namespace Haus {
                 .pDynamicState = &dynamicState,
                 .layout = m_PipelineLayout,
                 .renderPass = m_RenderPass,
-                .subpass = 0,
-
-                // Vulkan allows you to create a new graphics pipeline by deriving from an existing pipeline.
-                // The idea of pipeline derivatives is that it is less expensive to set up pipelines when they have much functionality
-                // in common with an existing pipeline and switching between pipelines from the same parent can also be done quicker.
-                .basePipelineHandle = VK_NULL_HANDLE,
-                .basePipelineIndex = -1
+                .subpass = 0
         };
 
         if (m_Device.createGraphicsPipelines(VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_GraphicsPipeline) !=
             vk::Result::eSuccess)
             throw std::runtime_error("Failed to create Graphics Pipeline");
 
+        CreateWireframePipeline(pipelineInfo, rasterizer);
+
         m_Device.destroyShaderModule(vertexShaderModule);
         m_Device.destroyShaderModule(fragmentShaderModule);
+    }
+
+    void Application::CreateWireframePipeline(vk::GraphicsPipelineCreateInfo& pipelineInfo, vk::PipelineRasterizationStateCreateInfo& rasterizer) {
+        rasterizer.polygonMode = vk::PolygonMode::eLine;
+
+        pipelineInfo.flags = vk::PipelineCreateFlagBits::eDerivative;
+        pipelineInfo.basePipelineHandle = m_GraphicsPipeline;
+        pipelineInfo.basePipelineIndex = -1;
+
+        if (m_Device.createGraphicsPipelines(VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_WireframePipeline) !=
+            vk::Result::eSuccess)
+            throw std::runtime_error("Failed to create Wireframe Pipeline");
     }
 
     void Application::CreateFramebuffers() {
@@ -596,9 +609,9 @@ namespace Haus {
 
     vk::CommandBuffer Application::BeginSingleTimeCommands() {
         vk::CommandBufferAllocateInfo allocateInfo{
-            .commandPool = m_CommandPool,
-            .level = vk::CommandBufferLevel::ePrimary,
-            .commandBufferCount = 1
+                .commandPool = m_CommandPool,
+                .level = vk::CommandBufferLevel::ePrimary,
+                .commandBufferCount = 1
         };
 
         vk::CommandBuffer commandBuffer;
@@ -606,7 +619,7 @@ namespace Haus {
             throw std::runtime_error("Failed to allocate command buffers");
 
         vk::CommandBufferBeginInfo beginInfo{
-            .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
+                .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
         };
 
         commandBuffer.begin(beginInfo);
@@ -618,8 +631,8 @@ namespace Haus {
         commandBuffer.end();
 
         vk::SubmitInfo submitInfo{
-            .commandBufferCount = 1,
-            .pCommandBuffers = &commandBuffer
+                .commandBufferCount = 1,
+                .pCommandBuffers = &commandBuffer
         };
 
         m_GraphicsQueue.submit(1, &submitInfo, VK_NULL_HANDLE);
@@ -632,21 +645,21 @@ namespace Haus {
         vk::CommandBuffer commandBuffer = BeginSingleTimeCommands();
 
         vk::BufferImageCopy region{
-            .bufferOffset = 0,
-            .bufferRowLength = 0,
-            .bufferImageHeight = 0,
-            .imageSubresource {
-                .aspectMask = vk::ImageAspectFlagBits::eColor,
-                .mipLevel = 0,
-                .baseArrayLayer = 0,
-                .layerCount = 1
-            },
-            .imageOffset {0, 0, 0},
-            .imageExtent {
-                .width = width,
-                .height = height,
-                .depth = 1
-            }
+                .bufferOffset = 0,
+                .bufferRowLength = 0,
+                .bufferImageHeight = 0,
+                .imageSubresource {
+                        .aspectMask = vk::ImageAspectFlagBits::eColor,
+                        .mipLevel = 0,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1
+                },
+                .imageOffset {0, 0, 0},
+                .imageExtent {
+                        .width = width,
+                        .height = height,
+                        .depth = 1
+                }
         };
 
         commandBuffer.copyBufferToImage(buffer, image, vk::ImageLayout::eTransferDstOptimal, 1, &region);
@@ -716,30 +729,33 @@ namespace Haus {
                     vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
                     vk::MemoryPropertyFlagBits::eDeviceLocal, m_CatImage, m_CatImageMemory);
 
-        TransitionImageLayout(m_CatImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+        TransitionImageLayout(m_CatImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined,
+                              vk::ImageLayout::eTransferDstOptimal);
         CopyBufferToImage(stagingBuffer, m_CatImage, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-        TransitionImageLayout(m_CatImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+        TransitionImageLayout(m_CatImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eTransferDstOptimal,
+                              vk::ImageLayout::eShaderReadOnlyOptimal);
 
         m_Device.destroyBuffer(stagingBuffer);
         m_Device.freeMemory(stagingBufferMemory);
     }
 
-    void Application::TransitionImageLayout(vk::Image image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout) {
+    void Application::TransitionImageLayout(vk::Image image, vk::Format format, vk::ImageLayout oldLayout,
+                                            vk::ImageLayout newLayout) {
         vk::CommandBuffer commandBuffer = BeginSingleTimeCommands();
 
         vk::ImageMemoryBarrier barrier{
-            .oldLayout = oldLayout,
-            .newLayout = newLayout,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = image,
-            .subresourceRange {
-                .aspectMask = vk::ImageAspectFlagBits::eColor,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1
-            },
+                .oldLayout = oldLayout,
+                .newLayout = newLayout,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = image,
+                .subresourceRange {
+                        .aspectMask = vk::ImageAspectFlagBits::eColor,
+                        .baseMipLevel = 0,
+                        .levelCount = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1
+                },
         };
 
         vk::PipelineStageFlags sourceStage;
@@ -751,7 +767,8 @@ namespace Haus {
 
             sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
             destinationStage = vk::PipelineStageFlagBits::eTransfer;
-        } else if (oldLayout == vk::ImageLayout::eTransferDstOptimal && newLayout == vk::ImageLayout::eShaderReadOnlyOptimal) {
+        } else if (oldLayout == vk::ImageLayout::eTransferDstOptimal &&
+                   newLayout == vk::ImageLayout::eShaderReadOnlyOptimal) {
             barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
             barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
 
@@ -767,7 +784,7 @@ namespace Haus {
                 0, nullptr,
                 0, nullptr,
                 1, &barrier
-                );
+        );
 
         EndSingleTimeCommands(commandBuffer);
     }
@@ -978,7 +995,7 @@ namespace Haus {
 
         commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
 
-        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_GraphicsPipeline);
+        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_WireframePipeline);
 
         vk::Viewport viewport{
                 .x = 0.0f,
@@ -1116,6 +1133,7 @@ namespace Haus {
         m_Device.destroyCommandPool(m_CommandPool);
 
         m_Device.destroyPipeline(m_GraphicsPipeline);
+        m_Device.destroyPipeline(m_WireframePipeline);
         m_Device.destroyPipelineLayout(m_PipelineLayout);
         m_Device.destroyRenderPass(m_RenderPass);
 
