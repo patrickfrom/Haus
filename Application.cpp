@@ -114,12 +114,19 @@ namespace Haus {
 
         glfwSetWindowUserPointer(m_Window, this);
         glfwSetFramebufferSizeCallback(m_Window, FramebufferResizeCallback);
+        glfwSetKeyCallback(m_Window, KeyCallback);
     }
 
     void Application::FramebufferResizeCallback(GLFWwindow *window, int width, int height) {
         auto app = reinterpret_cast<Application *>(glfwGetWindowUserPointer(window));
 
         app->m_FramebufferResized = true;
+    }
+
+    void Application::KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
+        auto app = reinterpret_cast<Application *>(glfwGetWindowUserPointer(window));
+        if (key == GLFW_KEY_E && action == GLFW_RELEASE)
+            app->m_WireframeEnabled = !app->m_WireframeEnabled;
     }
 
     void Application::CleanupGLFW() {
@@ -995,7 +1002,11 @@ namespace Haus {
 
         commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
 
-        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_WireframePipeline);
+        if (m_WireframeEnabled) {
+            commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_WireframePipeline);
+        } else {
+            commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_GraphicsPipeline);
+        }
 
         vk::Viewport viewport{
                 .x = 0.0f,

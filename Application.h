@@ -38,6 +38,7 @@ namespace Haus {
         void CleanupGLFW();
 
         static void FramebufferResizeCallback(GLFWwindow *window, int width, int height);
+        static void KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
 
         GLFWwindow *m_Window;
 
@@ -127,6 +128,8 @@ namespace Haus {
         void CreateSyncObjects();
 
         void CleanupVulkan();
+
+        bool m_WireframeEnabled = false;
 
         vk::Instance m_Instance;
         vk::SurfaceKHR m_Surface;
