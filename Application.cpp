@@ -559,7 +559,7 @@ namespace Haus {
                 .subpass = 0
         };
 
-        if (m_Device.createGraphicsPipelines(VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_GraphicsPipeline) !=
+        if (m_Device.createGraphicsPipelines(m_GraphicsPipelineCache, 1, &pipelineInfo, nullptr, &m_GraphicsPipeline) !=
             vk::Result::eSuccess)
             throw std::runtime_error("Failed to create Graphics Pipeline");
 
@@ -576,7 +576,7 @@ namespace Haus {
         pipelineInfo.basePipelineHandle = m_GraphicsPipeline;
         pipelineInfo.basePipelineIndex = -1;
 
-        if (m_Device.createGraphicsPipelines(VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_WireframePipeline) !=
+        if (m_Device.createGraphicsPipelines(m_GraphicsPipelineCache, 1, &pipelineInfo, nullptr, &m_WireframePipeline) !=
             vk::Result::eSuccess)
             throw std::runtime_error("Failed to create Wireframe Pipeline");
     }
@@ -1143,6 +1143,7 @@ namespace Haus {
 
         m_Device.destroyCommandPool(m_CommandPool);
 
+        m_Device.destroyPipelineCache(m_GraphicsPipelineCache);
         m_Device.destroyPipeline(m_GraphicsPipeline);
         m_Device.destroyPipeline(m_WireframePipeline);
         m_Device.destroyPipelineLayout(m_PipelineLayout);

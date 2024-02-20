@@ -148,6 +148,7 @@ namespace Haus {
         vk::DescriptorSetLayout m_DescriptorSetLayout;
         vk::PipelineLayout m_PipelineLayout;
         vk::Pipeline m_GraphicsPipeline;
+        vk::PipelineCache m_GraphicsPipelineCache;
         vk::Pipeline m_WireframePipeline;
 
         vk::CommandPool m_CommandPool;
