@@ -152,6 +152,8 @@ namespace Haus {
         CreateFramebuffers();
         CreateCommandPool();
         CreateTextureImage();
+        CreateTextureImageView();
+        CreateTextureSampler();
         CreateVertexBuffer();
         CreateIndexBuffer();
         CreateUniformBuffers();
@@ -191,11 +193,10 @@ namespace Haus {
             throw std::runtime_error("Failed to create window surface!");
     }
 
-    // TODO - Do Later perhaps?
     bool IsDeviceSuitable(vk::PhysicalDevice device) {
         vk::PhysicalDeviceProperties deviceProperties = device.getProperties();
         vk::PhysicalDeviceFeatures deviceFeatures = device.getFeatures();
-        return deviceFeatures.geometryShader;
+        return deviceFeatures.geometryShader && deviceFeatures.fillModeNonSolid && deviceFeatures.samplerAnisotropy;
     }
 
     void Application::PickPhysicalDevice() {
@@ -228,7 +229,8 @@ namespace Haus {
         };
 
         vk::PhysicalDeviceFeatures deviceFeatures{
-            .fillModeNonSolid = vk::True
+            .fillModeNonSolid = vk::True,
+            .samplerAnisotropy = vk::True
         };
 
         std::vector<const char *> enabledExtensions = {"VK_KHR_swapchain"};
@@ -339,27 +341,7 @@ namespace Haus {
         m_SwapchainImageViews.resize(m_SwapchainImages.size());
 
         for (size_t i = 0; i < m_SwapchainImages.size(); i++) {
-            vk::ImageViewCreateInfo createInfo{
-                    .image = m_SwapchainImages[i],
-                    .viewType = vk::ImageViewType::e2D,
-                    .format = m_SwapchainImageFormat,
-                    .components {
-                            .r = vk::ComponentSwizzle::eIdentity,
-                            .g = vk::ComponentSwizzle::eIdentity,
-                            .b = vk::ComponentSwizzle::eIdentity,
-                            .a = vk::ComponentSwizzle::eIdentity,
-                    },
-                    .subresourceRange {
-                            .aspectMask = vk::ImageAspectFlagBits::eColor,
-                            .baseMipLevel = 0,
-                            .levelCount = 1,
-                            .baseArrayLayer = 0,
-                            .layerCount = 1
-                    }
-            };
-
-            if (m_Device.createImageView(&createInfo, nullptr, &m_SwapchainImageViews[i]) != vk::Result::eSuccess)
-                throw std::runtime_error("Failed to create image views!");
+            m_SwapchainImageViews[i] = CreateImageView(m_SwapchainImages[i], m_SwapchainImageFormat);
         }
     }
 
@@ -746,6 +728,56 @@ namespace Haus {
         m_Device.freeMemory(stagingBufferMemory);
     }
 
+    vk::ImageView Application::CreateImageView(vk::Image image, vk::Format format) {
+        vk::ImageViewCreateInfo viewInfo{
+                .image = image,
+                .viewType = vk::ImageViewType::e2D,
+                .format = format,
+                .subresourceRange {
+                        .aspectMask = vk::ImageAspectFlagBits::eColor,
+                        .baseMipLevel = 0,
+                        .levelCount = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1
+                }
+        };
+
+        vk::ImageView imageView;
+        if (m_Device.createImageView(&viewInfo, nullptr, &imageView) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to create image view");
+
+        return imageView;
+    }
+
+    void Application::CreateTextureImageView() {
+        m_CatImageView = CreateImageView(m_CatImage, vk::Format::eR8G8B8A8Srgb);
+    }
+
+    void Application::CreateTextureSampler() {
+        vk::PhysicalDeviceProperties properties = m_PhysicalDevice.getProperties();
+
+        vk::SamplerCreateInfo samplerInfo{
+            .magFilter = vk::Filter::eLinear,
+            .minFilter = vk::Filter::eLinear,
+            .mipmapMode = vk::SamplerMipmapMode::eLinear,
+            .addressModeU = vk::SamplerAddressMode::eRepeat,
+            .addressModeV = vk::SamplerAddressMode::eRepeat,
+            .addressModeW = vk::SamplerAddressMode::eRepeat,
+            .mipLodBias = 0.0f,
+            .anisotropyEnable = vk::True,
+            .maxAnisotropy = properties.limits.maxSamplerAnisotropy,
+            .compareEnable = vk::False,
+            .compareOp = vk::CompareOp::eAlways,
+            .minLod = 0.0f,
+            .maxLod = 0.0f,
+            .borderColor = vk::BorderColor::eIntOpaqueBlack,
+            .unnormalizedCoordinates = vk::False,
+        };
+
+        if (m_Device.createSampler(&samplerInfo, nullptr, &m_CatSampler) != vk::Result::eSuccess)
+            throw std::runtime_error("Failed to create texture sampler");
+    }
+
     void Application::TransitionImageLayout(vk::Image image, vk::Format format, vk::ImageLayout oldLayout,
                                             vk::ImageLayout newLayout) {
         vk::CommandBuffer commandBuffer = BeginSingleTimeCommands();
@@ -1014,7 +1046,7 @@ namespace Haus {
                 .width = (float) m_SwapchainExtent.width,
                 .height = -(float) m_SwapchainExtent.height,
                 .minDepth = 0.0f,
-                .maxDepth = 1.0f,
+                .maxDepth = 1.0f
         };
 
         vk::Rect2D scissor{
@@ -1125,6 +1157,9 @@ namespace Haus {
 
         m_Device.destroyDescriptorPool(m_DescriptorPool);
         m_Device.destroyDescriptorSetLayout(m_DescriptorSetLayout);
+
+        m_Device.destroySampler(m_CatSampler);
+        m_Device.destroyImageView(m_CatImageView);
 
         m_Device.destroyImage(m_CatImage);
         m_Device.freeMemory(m_CatImageMemory);

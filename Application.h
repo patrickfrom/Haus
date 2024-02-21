@@ -53,6 +53,8 @@ namespace Haus {
 
         uint32_t m_MinImageCount;
 
+        vk::ImageView CreateImageView(vk::Image image, vk::Format format);
+
         SwapChainSupportDetails QuerySwapChainSupport(vk::PhysicalDevice device);
 
         vk::ShaderModule CreateShaderModule(const std::vector<char> &code);
@@ -113,6 +115,10 @@ namespace Haus {
 
         void CreateTextureImage();
 
+        void CreateTextureImageView();
+
+        void CreateTextureSampler();
+
         void CreateVertexBuffer();
 
         void CreateIndexBuffer();
@@ -172,6 +178,8 @@ namespace Haus {
         std::vector<vk::DescriptorSet> m_DescriptorSets;
 
         vk::Image m_CatImage;
+        vk::ImageView m_CatImageView;
+        vk::Sampler m_CatSampler;
         vk::DeviceMemory m_CatImageMemory;
 
         vk::ClearValue m_ClearColor = {{{{0.0f, 0.0f, 0.0f, 1.0}}}};
