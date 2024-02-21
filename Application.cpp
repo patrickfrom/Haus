@@ -26,6 +26,7 @@ namespace Haus {
     struct Vertex {
         glm::vec2 Position;
         glm::vec3 Color;
+        glm::vec2 TextureCoord;
 
         static vk::VertexInputBindingDescription GetBindingDescription() {
             vk::VertexInputBindingDescription bindingDescription{
@@ -37,8 +38,8 @@ namespace Haus {
             return bindingDescription;
         }
 
-        static std::array<vk::VertexInputAttributeDescription, 2> GetAttributeDescriptions() {
-            std::array<vk::VertexInputAttributeDescription, 2> attributeDescription{
+        static std::array<vk::VertexInputAttributeDescription, 3> GetAttributeDescriptions() {
+            std::array<vk::VertexInputAttributeDescription, 3> attributeDescription{
                     vk::VertexInputAttributeDescription{
                             .location = 0,
                             .binding = 0,
@@ -50,6 +51,12 @@ namespace Haus {
                             .binding = 0,
                             .format = vk::Format::eR32G32B32Sfloat,
                             .offset = offsetof(Vertex, Color)
+                    },
+                    vk::VertexInputAttributeDescription{
+                            .location = 2,
+                            .binding = 0,
+                            .format = vk::Format::eR32G32Sfloat,
+                            .offset = offsetof(Vertex, TextureCoord)
                     }
             };
 
@@ -58,10 +65,10 @@ namespace Haus {
     };
 
     const std::vector<Vertex> vertices = {
-            {{0.5f,  0.5f},  {1.0f, 0.0f,  0.0f}},
-            {{0.5f,  -0.5f}, {1.0f, 0.32f, 0.32f}},
-            {{-0.5f, -0.5f}, {1.0f, 0.29f, 0.14f}},
-            {{-0.5f, 0.5f},  {1.0f, 0.32f, 0.32f}}
+            {{0.5f,  0.5f},  {1.0f, 0.0f,  0.0f}, {1.0f, 1.0f}},
+            {{0.5f,  -0.5f}, {1.0f, 0.32f, 0.32f}, {1.0f, 0.0f}},
+            {{-0.5f, -0.5f}, {1.0f, 0.29f, 0.14f}, {0.0f, 0.0f}},
+            {{-0.5f, 0.5f},  {1.0f, 0.32f, 0.32f}, {0.0f, 1.0f}}
     };
 
     const std::vector<uint16_t> indices{
@@ -426,9 +433,20 @@ namespace Haus {
                 .stageFlags = vk::ShaderStageFlagBits::eVertex
         };
 
+        vk::DescriptorSetLayoutBinding samplerLayoutBinding{
+            .binding = 1,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment
+        };
+
+        std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {
+                uboLayoutBinding, samplerLayoutBinding
+        };
+
         vk::DescriptorSetLayoutCreateInfo layoutInfo{
-                .bindingCount = 1,
-                .pBindings = &uboLayoutBinding
+                .bindingCount = static_cast<uint32_t>(bindings.size()),
+                .pBindings = bindings.data()
         };
 
         if (m_Device.createDescriptorSetLayout(&layoutInfo, nullptr, &m_DescriptorSetLayout) != vk::Result::eSuccess)
@@ -694,6 +712,7 @@ namespace Haus {
     }
 
     void Application::CreateTextureImage() {
+        stbi_set_flip_vertically_on_load(true);
         int width, height, channels;
         stbi_uc *pixels = stbi_load("textures/cat.png", &width, &height, &channels, STBI_rgb_alpha);
         vk::DeviceSize imageSize = width * height * 4;
@@ -934,15 +953,21 @@ namespace Haus {
     }
 
     void Application::CreateDescriptorPool() {
-        vk::DescriptorPoolSize poolSize{
-                .type = vk::DescriptorType::eUniformBuffer,
-                .descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
+        std::array<vk::DescriptorPoolSize, 2> poolSizes{
+            vk::DescriptorPoolSize {
+                    .type = vk::DescriptorType::eUniformBuffer,
+                    .descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
+            },
+            vk::DescriptorPoolSize{
+                    .type = vk::DescriptorType::eCombinedImageSampler,
+                    .descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
+            },
         };
 
         vk::DescriptorPoolCreateInfo poolInfo{
                 .maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
-                .poolSizeCount = 1,
-                .pPoolSizes = &poolSize,
+                .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+                .pPoolSizes = poolSizes.data()
         };
 
         if (m_Device.createDescriptorPool(&poolInfo, nullptr, &m_DescriptorPool) != vk::Result::eSuccess)
@@ -969,16 +994,33 @@ namespace Haus {
                     .range = sizeof(UniformBufferObject)
             };
 
-            vk::WriteDescriptorSet descriptorWrite{
-                    .dstSet = m_DescriptorSets[i],
-                    .dstBinding = 0,
-                    .dstArrayElement = 0,
-                    .descriptorCount = 1,
-                    .descriptorType = vk::DescriptorType::eUniformBuffer,
-                    .pBufferInfo = &bufferInfo
+            vk::DescriptorImageInfo imageInfo{
+                .sampler = m_CatSampler,
+                .imageView = m_CatImageView,
+                .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
             };
 
-            m_Device.updateDescriptorSets(1, &descriptorWrite, 0, nullptr);
+            std::array<vk::WriteDescriptorSet, 2> descriptorWrites{
+                vk::WriteDescriptorSet{
+                        .dstSet = m_DescriptorSets[i],
+                        .dstBinding = 0,
+                        .dstArrayElement = 0,
+                        .descriptorCount = 1,
+                        .descriptorType = vk::DescriptorType::eUniformBuffer,
+                        .pBufferInfo = &bufferInfo
+                },
+                    vk::WriteDescriptorSet{
+                        .dstSet = m_DescriptorSets[i],
+                        .dstBinding = 1,
+                        .dstArrayElement = 0,
+                        .descriptorCount = 1,
+                        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                        .pImageInfo = &imageInfo
+                    },
+            };
+
+
+            m_Device.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
         }
     }
 
