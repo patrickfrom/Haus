@@ -53,7 +53,7 @@ namespace Haus {
 
         uint32_t m_MinImageCount;
 
-        vk::ImageView CreateImageView(vk::Image image, vk::Format format);
+        vk::ImageView CreateImageView(vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags);
 
         SwapChainSupportDetails QuerySwapChainSupport(vk::PhysicalDevice device);
 
@@ -112,6 +112,8 @@ namespace Haus {
         void CreateFramebuffers();
 
         void CreateCommandPool();
+
+        void CreateDepthResources();
 
         void CreateTextureImage();
 
@@ -181,6 +183,10 @@ namespace Haus {
         vk::ImageView m_CatImageView;
         vk::Sampler m_CatSampler;
         vk::DeviceMemory m_CatImageMemory;
+
+        vk::Image m_DepthImage;
+        vk::ImageView m_DepthImageView;
+        vk::DeviceMemory m_DepthImageMemory;
 
         vk::ClearValue m_ClearColor = {{{{0.0f, 0.0f, 0.0f, 1.0}}}};
 

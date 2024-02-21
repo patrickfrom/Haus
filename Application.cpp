@@ -5,6 +5,7 @@
 #include <chrono>
 
 #define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -24,7 +25,7 @@ namespace Haus {
     };
 
     struct Vertex {
-        glm::vec2 Position;
+        glm::vec3 Position;
         glm::vec3 Color;
         glm::vec2 TextureCoord;
 
@@ -43,7 +44,7 @@ namespace Haus {
                     vk::VertexInputAttributeDescription{
                             .location = 0,
                             .binding = 0,
-                            .format = vk::Format::eR32G32Sfloat,
+                            .format = vk::Format::eR32G32B32Sfloat,
                             .offset = offsetof(Vertex, Position)
                     },
                     vk::VertexInputAttributeDescription{
@@ -65,15 +66,23 @@ namespace Haus {
     };
 
     const std::vector<Vertex> vertices = {
-            {{0.5f,  0.5f},  {1.0f, 0.0f,  0.0f}, {1.0f, 1.0f}},
-            {{0.5f,  -0.5f}, {1.0f, 0.32f, 0.32f}, {1.0f, 0.0f}},
-            {{-0.5f, -0.5f}, {1.0f, 0.29f, 0.14f}, {0.0f, 0.0f}},
-            {{-0.5f, 0.5f},  {1.0f, 0.32f, 0.32f}, {0.0f, 1.0f}}
+            {{0.5f,  0.5f,  0.0f},  {1.0f, 0.0f,  0.0f},  {1.0f, 1.0f}},
+            {{0.5f,  -0.5f, 0.0f},  {1.0f, 0.32f, 0.32f}, {1.0f, 0.0f}},
+            {{-0.5f, -0.5f, 0.0f},  {1.0f, 0.29f, 0.14f}, {0.0f, 0.0f}},
+            {{-0.5f, 0.5f,  0.0f},  {1.0f, 0.32f, 0.32f}, {0.0f, 1.0f}},
+
+            {{0.5f,  0.5f,  -0.5f}, {1.0f, 0.0f,  0.0f},  {1.0f, 1.0f}},
+            {{0.5f,  -0.5f, -0.5f}, {1.0f, 0.32f, 0.32f}, {1.0f, 0.0f}},
+            {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.29f, 0.14f}, {0.0f, 0.0f}},
+            {{-0.5f, 0.5f,  -0.5f}, {1.0f, 0.32f, 0.32f}, {0.0f, 1.0f}}
     };
 
     const std::vector<uint16_t> indices{
             0, 1, 2,
-            2, 3, 0
+            2, 3, 0,
+
+            4, 5, 6,
+            6, 7, 4
     };
 
 #pragma region APPLICATION
@@ -156,8 +165,9 @@ namespace Haus {
         CreateRenderPass();
         CreateDescriptorSetLayout();
         CreateGraphicsPipeline();
-        CreateFramebuffers();
         CreateCommandPool();
+        CreateDepthResources();
+        CreateFramebuffers();
         CreateTextureImage();
         CreateTextureImageView();
         CreateTextureSampler();
@@ -236,8 +246,8 @@ namespace Haus {
         };
 
         vk::PhysicalDeviceFeatures deviceFeatures{
-            .fillModeNonSolid = vk::True,
-            .samplerAnisotropy = vk::True
+                .fillModeNonSolid = vk::True,
+                .samplerAnisotropy = vk::True
         };
 
         std::vector<const char *> enabledExtensions = {"VK_KHR_swapchain"};
@@ -319,6 +329,10 @@ namespace Haus {
     }
 
     void Application::CleanupSwapchain() {
+        m_Device.destroyImageView(m_DepthImageView);
+        m_Device.destroyImage(m_DepthImage);
+        m_Device.freeMemory(m_DepthImageMemory);
+
         for (auto framebuffer: m_SwapchainFramebuffers)
             m_Device.destroyFramebuffer(framebuffer);
 
@@ -341,6 +355,7 @@ namespace Haus {
 
         CreateSwapchain();
         CreateImageViews();
+        CreateDepthResources();
         CreateFramebuffers();
     }
 
@@ -348,7 +363,8 @@ namespace Haus {
         m_SwapchainImageViews.resize(m_SwapchainImages.size());
 
         for (size_t i = 0; i < m_SwapchainImages.size(); i++) {
-            m_SwapchainImageViews[i] = CreateImageView(m_SwapchainImages[i], m_SwapchainImageFormat);
+            m_SwapchainImageViews[i] = CreateImageView(m_SwapchainImages[i], m_SwapchainImageFormat,
+                                                       vk::ImageAspectFlagBits::eColor);
         }
     }
 
@@ -369,24 +385,45 @@ namespace Haus {
                 .layout = vk::ImageLayout::eColorAttachmentOptimal
         };
 
+        vk::AttachmentDescription depthAttachment {
+            .format = vk::Format::eD32Sfloat,
+            .samples = vk::SampleCountFlagBits::e1,
+            .loadOp = vk::AttachmentLoadOp::eClear,
+            .storeOp = vk::AttachmentStoreOp::eDontCare,
+            .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+            .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+            .initialLayout = vk::ImageLayout::eUndefined,
+            .finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal
+        };
+
+        vk::AttachmentReference depthAttachmentReference{
+            .attachment = 1,
+            .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal
+        };
+
         vk::SubpassDescription subpass{
                 .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
                 .colorAttachmentCount = 1,
                 .pColorAttachments = &colorAttachmentReference,
+                .pDepthStencilAttachment = &depthAttachmentReference
         };
 
         vk::SubpassDependency dependency{
                 .srcSubpass = VK_SUBPASS_EXTERNAL,
                 .dstSubpass = 0,
-                .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
+                .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
                 .srcAccessMask = vk::AccessFlagBits::eNone,
-                .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite
+                .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite
+        };
+
+        std::array<vk::AttachmentDescription, 2> attachments = {
+                colorAttachment, depthAttachment
         };
 
         vk::RenderPassCreateInfo renderPassInfo{
-                .attachmentCount = 1,
-                .pAttachments = &colorAttachment,
+                .attachmentCount = static_cast<uint32_t>(attachments.size()),
+                .pAttachments = attachments.data(),
                 .subpassCount = 1,
                 .pSubpasses = &subpass,
                 .dependencyCount = 1,
@@ -434,10 +471,10 @@ namespace Haus {
         };
 
         vk::DescriptorSetLayoutBinding samplerLayoutBinding{
-            .binding = 1,
-            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment
+                .binding = 1,
+                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment
         };
 
         std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {
@@ -540,6 +577,16 @@ namespace Haus {
                 .pSetLayouts = &m_DescriptorSetLayout
         };
 
+        vk::PipelineDepthStencilStateCreateInfo depthStencil{
+            .depthTestEnable = vk::True,
+            .depthWriteEnable = vk::True,
+            .depthCompareOp = vk::CompareOp::eLess,
+            .depthBoundsTestEnable = vk::False,
+            .stencilTestEnable = vk::False,
+            .minDepthBounds = 0.0f,
+            .maxDepthBounds = 1.0f
+        };
+
         if (m_Device.createPipelineLayout(&pipelineLayoutInfo, nullptr, &m_PipelineLayout) != vk::Result::eSuccess)
             throw std::runtime_error("Failed to create pipeline layout!");
 
@@ -552,6 +599,7 @@ namespace Haus {
                 .pViewportState = &viewportState,
                 .pRasterizationState = &rasterizer,
                 .pMultisampleState = &multisampling,
+                .pDepthStencilState = &depthStencil,
                 .pColorBlendState = &colorBlending,
                 .pDynamicState = &dynamicState,
                 .layout = m_PipelineLayout,
@@ -569,14 +617,16 @@ namespace Haus {
         m_Device.destroyShaderModule(fragmentShaderModule);
     }
 
-    void Application::CreateWireframePipeline(vk::GraphicsPipelineCreateInfo& pipelineInfo, vk::PipelineRasterizationStateCreateInfo& rasterizer) {
+    void Application::CreateWireframePipeline(vk::GraphicsPipelineCreateInfo &pipelineInfo,
+                                              vk::PipelineRasterizationStateCreateInfo &rasterizer) {
         rasterizer.polygonMode = vk::PolygonMode::eLine;
 
         pipelineInfo.flags = vk::PipelineCreateFlagBits::eDerivative;
         pipelineInfo.basePipelineHandle = m_GraphicsPipeline;
         pipelineInfo.basePipelineIndex = -1;
 
-        if (m_Device.createGraphicsPipelines(m_GraphicsPipelineCache, 1, &pipelineInfo, nullptr, &m_WireframePipeline) !=
+        if (m_Device.createGraphicsPipelines(m_GraphicsPipelineCache, 1, &pipelineInfo, nullptr,
+                                             &m_WireframePipeline) !=
             vk::Result::eSuccess)
             throw std::runtime_error("Failed to create Wireframe Pipeline");
     }
@@ -585,14 +635,15 @@ namespace Haus {
         m_SwapchainFramebuffers.resize(m_SwapchainImageViews.size());
 
         for (size_t i = 0; i < m_SwapchainImageViews.size(); i++) {
-            vk::ImageView attachments[] = {
-                    m_SwapchainImageViews[i]
+            std::array<vk::ImageView, 2> attachments = {
+                    m_SwapchainImageViews[i],
+                    m_DepthImageView
             };
 
             vk::FramebufferCreateInfo framebufferInfo{
                     .renderPass = m_RenderPass,
-                    .attachmentCount = 1,
-                    .pAttachments = attachments,
+                    .attachmentCount = static_cast<uint32_t>(attachments.size()),
+                    .pAttachments = attachments.data(),
                     .width = m_SwapchainExtent.width,
                     .height = m_SwapchainExtent.height,
                     .layers = 1
@@ -612,6 +663,16 @@ namespace Haus {
 
         if (m_Device.createCommandPool(&poolInfo, nullptr, &m_CommandPool) != vk::Result::eSuccess)
             throw std::runtime_error("Failed to create command pool");
+    }
+
+    void Application::CreateDepthResources() {
+        CreateImage(m_SwapchainExtent.width, m_SwapchainExtent.height, vk::Format::eD32Sfloat,
+                    vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment,
+                    vk::MemoryPropertyFlagBits::eDeviceLocal, m_DepthImage, m_DepthImageMemory);
+        m_DepthImageView = CreateImageView(m_DepthImage, vk::Format::eD32Sfloat, vk::ImageAspectFlagBits::eDepth);
+
+        TransitionImageLayout(m_DepthImage, vk::Format::eD32Sfloat, vk::ImageLayout::eUndefined,
+                              vk::ImageLayout::eDepthStencilAttachmentOptimal);
     }
 
     vk::CommandBuffer Application::BeginSingleTimeCommands() {
@@ -747,13 +808,13 @@ namespace Haus {
         m_Device.freeMemory(stagingBufferMemory);
     }
 
-    vk::ImageView Application::CreateImageView(vk::Image image, vk::Format format) {
+    vk::ImageView Application::CreateImageView(vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags) {
         vk::ImageViewCreateInfo viewInfo{
                 .image = image,
                 .viewType = vk::ImageViewType::e2D,
                 .format = format,
                 .subresourceRange {
-                        .aspectMask = vk::ImageAspectFlagBits::eColor,
+                        .aspectMask = aspectFlags,
                         .baseMipLevel = 0,
                         .levelCount = 1,
                         .baseArrayLayer = 0,
@@ -769,28 +830,28 @@ namespace Haus {
     }
 
     void Application::CreateTextureImageView() {
-        m_CatImageView = CreateImageView(m_CatImage, vk::Format::eR8G8B8A8Srgb);
+        m_CatImageView = CreateImageView(m_CatImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
     }
 
     void Application::CreateTextureSampler() {
         vk::PhysicalDeviceProperties properties = m_PhysicalDevice.getProperties();
 
         vk::SamplerCreateInfo samplerInfo{
-            .magFilter = vk::Filter::eLinear,
-            .minFilter = vk::Filter::eLinear,
-            .mipmapMode = vk::SamplerMipmapMode::eLinear,
-            .addressModeU = vk::SamplerAddressMode::eRepeat,
-            .addressModeV = vk::SamplerAddressMode::eRepeat,
-            .addressModeW = vk::SamplerAddressMode::eRepeat,
-            .mipLodBias = 0.0f,
-            .anisotropyEnable = vk::True,
-            .maxAnisotropy = properties.limits.maxSamplerAnisotropy,
-            .compareEnable = vk::False,
-            .compareOp = vk::CompareOp::eAlways,
-            .minLod = 0.0f,
-            .maxLod = 0.0f,
-            .borderColor = vk::BorderColor::eIntOpaqueBlack,
-            .unnormalizedCoordinates = vk::False,
+                .magFilter = vk::Filter::eLinear,
+                .minFilter = vk::Filter::eLinear,
+                .mipmapMode = vk::SamplerMipmapMode::eLinear,
+                .addressModeU = vk::SamplerAddressMode::eRepeat,
+                .addressModeV = vk::SamplerAddressMode::eRepeat,
+                .addressModeW = vk::SamplerAddressMode::eRepeat,
+                .mipLodBias = 0.0f,
+                .anisotropyEnable = vk::True,
+                .maxAnisotropy = properties.limits.maxSamplerAnisotropy,
+                .compareEnable = vk::False,
+                .compareOp = vk::CompareOp::eAlways,
+                .minLod = 0.0f,
+                .maxLod = 0.0f,
+                .borderColor = vk::BorderColor::eIntOpaqueBlack,
+                .unnormalizedCoordinates = vk::False,
         };
 
         if (m_Device.createSampler(&samplerInfo, nullptr, &m_CatSampler) != vk::Result::eSuccess)
@@ -808,7 +869,6 @@ namespace Haus {
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .image = image,
                 .subresourceRange {
-                        .aspectMask = vk::ImageAspectFlagBits::eColor,
                         .baseMipLevel = 0,
                         .levelCount = 1,
                         .baseArrayLayer = 0,
@@ -818,6 +878,12 @@ namespace Haus {
 
         vk::PipelineStageFlags sourceStage;
         vk::PipelineStageFlags destinationStage;
+
+        if (newLayout == vk::ImageLayout::eDepthStencilAttachmentOptimal) {
+            barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
+        } else {
+            barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+        }
 
         if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eTransferDstOptimal) {
             barrier.srcAccessMask = vk::AccessFlagBits::eNone;
@@ -832,6 +898,12 @@ namespace Haus {
 
             sourceStage = vk::PipelineStageFlagBits::eTransfer;
             destinationStage = vk::PipelineStageFlagBits::eFragmentShader;
+        } else if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eDepthStencilAttachmentOptimal) {
+            barrier.srcAccessMask = vk::AccessFlagBits::eNone;
+            barrier.dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+
+            sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
+            destinationStage = vk::PipelineStageFlagBits::eEarlyFragmentTests;
         } else {
             throw std::invalid_argument("Unsupported layout transition!");
         }
@@ -954,14 +1026,14 @@ namespace Haus {
 
     void Application::CreateDescriptorPool() {
         std::array<vk::DescriptorPoolSize, 2> poolSizes{
-            vk::DescriptorPoolSize {
-                    .type = vk::DescriptorType::eUniformBuffer,
-                    .descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
-            },
-            vk::DescriptorPoolSize{
-                    .type = vk::DescriptorType::eCombinedImageSampler,
-                    .descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
-            },
+                vk::DescriptorPoolSize{
+                        .type = vk::DescriptorType::eUniformBuffer,
+                        .descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
+                },
+                vk::DescriptorPoolSize{
+                        .type = vk::DescriptorType::eCombinedImageSampler,
+                        .descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
+                },
         };
 
         vk::DescriptorPoolCreateInfo poolInfo{
@@ -995,32 +1067,33 @@ namespace Haus {
             };
 
             vk::DescriptorImageInfo imageInfo{
-                .sampler = m_CatSampler,
-                .imageView = m_CatImageView,
-                .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+                    .sampler = m_CatSampler,
+                    .imageView = m_CatImageView,
+                    .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
             };
 
             std::array<vk::WriteDescriptorSet, 2> descriptorWrites{
-                vk::WriteDescriptorSet{
-                        .dstSet = m_DescriptorSets[i],
-                        .dstBinding = 0,
-                        .dstArrayElement = 0,
-                        .descriptorCount = 1,
-                        .descriptorType = vk::DescriptorType::eUniformBuffer,
-                        .pBufferInfo = &bufferInfo
-                },
                     vk::WriteDescriptorSet{
-                        .dstSet = m_DescriptorSets[i],
-                        .dstBinding = 1,
-                        .dstArrayElement = 0,
-                        .descriptorCount = 1,
-                        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                        .pImageInfo = &imageInfo
+                            .dstSet = m_DescriptorSets[i],
+                            .dstBinding = 0,
+                            .dstArrayElement = 0,
+                            .descriptorCount = 1,
+                            .descriptorType = vk::DescriptorType::eUniformBuffer,
+                            .pBufferInfo = &bufferInfo
+                    },
+                    vk::WriteDescriptorSet{
+                            .dstSet = m_DescriptorSets[i],
+                            .dstBinding = 1,
+                            .dstArrayElement = 0,
+                            .descriptorCount = 1,
+                            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                            .pImageInfo = &imageInfo
                     },
             };
 
 
-            m_Device.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+            m_Device.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0,
+                                          nullptr);
         }
     }
 
@@ -1063,6 +1136,15 @@ namespace Haus {
         if (commandBuffer.begin(&beginInfo) != vk::Result::eSuccess)
             throw std::runtime_error("Failed to begin recording command buffer");
 
+        std::array<vk::ClearValue, 2> clearValues {
+            m_ClearColor,
+            vk::ClearValue {
+                    .depthStencil {
+                        1.0f, 0
+                    }
+            }
+        };
+
         vk::RenderPassBeginInfo renderPassInfo{
                 .renderPass = m_RenderPass,
                 .framebuffer = m_SwapchainFramebuffers[imageIndex],
@@ -1070,8 +1152,8 @@ namespace Haus {
                         .offset = {0, 0},
                         .extent = m_SwapchainExtent
                 },
-                .clearValueCount = 1,
-                .pClearValues = &m_ClearColor
+                .clearValueCount = static_cast<uint32_t>(clearValues.size()),
+                .pClearValues = clearValues.data()
         };
 
         commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
@@ -1202,7 +1284,6 @@ namespace Haus {
 
         m_Device.destroySampler(m_CatSampler);
         m_Device.destroyImageView(m_CatImageView);
-
         m_Device.destroyImage(m_CatImage);
         m_Device.freeMemory(m_CatImageMemory);
 
