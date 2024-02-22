@@ -142,7 +142,7 @@ namespace Haus {
     Application::Application(ApplicationSpecification &specification) : m_Specification(specification) {}
 
     void Application::Run() {
-        std::cout << std::format("Starting Application {}", m_Specification.Name) << std::endl;
+        std::cout << std::format("Starting Application {}", m_Specification.Name) << "\n";
 
         InitWindow();
         InitVulkan();
@@ -150,7 +150,7 @@ namespace Haus {
     }
 
     void Application::Shutdown() {
-        std::cout << std::format("Closing Application {}", m_Specification.Name) << std::endl;
+        std::cout << std::format("Closing Application {}", m_Specification.Name) << "\n";
 
         CleanupVulkan();
         CleanupGLFW();
@@ -207,7 +207,7 @@ namespace Haus {
 #pragma region VULKAN
 
     void Application::InitVulkan() {
-        std::cout << "Initializing Vulkan" << std::endl;
+        std::cout << "Initializing Vulkan" << "\n";
         CreateInstance();
         CreateSurface();
         PickPhysicalDevice();
@@ -285,8 +285,8 @@ namespace Haus {
             throw std::runtime_error("Failed to find a suitable GPU!");
 
         vk::PhysicalDeviceProperties deviceProperties = m_PhysicalDevice.getProperties();
-        std::cout << deviceProperties.deviceName << std::endl;
-        std::cout << to_string(deviceProperties.deviceType) << std::endl;
+        std::cout << deviceProperties.deviceName << "\n";
+        std::cout << to_string(deviceProperties.deviceType) << "\n";
     }
 
     void Application::CreateLogicalDevice() {
