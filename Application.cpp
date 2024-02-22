@@ -66,23 +66,67 @@ namespace Haus {
     };
 
     const std::vector<Vertex> vertices = {
-            {{0.5f,  0.5f,  0.0f},  {1.0f, 0.0f,  0.0f},  {1.0f, 1.0f}},
-            {{0.5f,  -0.5f, 0.0f},  {1.0f, 0.32f, 0.32f}, {1.0f, 0.0f}},
-            {{-0.5f, -0.5f, 0.0f},  {1.0f, 0.29f, 0.14f}, {0.0f, 0.0f}},
-            {{-0.5f, 0.5f,  0.0f},  {1.0f, 0.32f, 0.32f}, {0.0f, 1.0f}},
+            // Front face
+            {{0.5f,  0.5f,  0.5f},  {1.0f, 0.0f,  0.0f},  {1.0f, 1.0f}}, // 0
+            {{0.5f,  -0.5f, 0.5f},  {1.0f, 0.32f, 0.32f}, {1.0f, 0.0f}}, // 1
+            {{-0.5f, -0.5f, 0.5f},  {1.0f, 0.29f, 0.14f}, {0.0f, 0.0f}}, // 2
+            {{-0.5f, 0.5f,  0.5f},  {1.0f, 0.32f, 0.32f}, {0.0f, 1.0f}}, // 3
 
-            {{0.5f,  0.5f,  -0.5f}, {1.0f, 0.0f,  0.0f},  {1.0f, 1.0f}},
-            {{0.5f,  -0.5f, -0.5f}, {1.0f, 0.32f, 0.32f}, {1.0f, 0.0f}},
-            {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.29f, 0.14f}, {0.0f, 0.0f}},
-            {{-0.5f, 0.5f,  -0.5f}, {1.0f, 0.32f, 0.32f}, {0.0f, 1.0f}}
+            // Back face
+            {{0.5f,  0.5f,  -0.5f}, {1.0f, 0.0f,  0.0f},  {1.0f, 1.0f}}, // 4
+            {{0.5f,  -0.5f, -0.5f}, {1.0f, 0.32f, 0.32f}, {1.0f, 0.0f}}, // 5
+            {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.29f, 0.14f}, {0.0f, 0.0f}}, // 6
+            {{-0.5f, 0.5f,  -0.5f}, {1.0f, 0.32f, 0.32f}, {0.0f, 1.0f}}, // 7
+
+            // Right face
+            {{0.5f,  0.5f,  0.5f},  {1.0f, 0.0f,  0.0f},  {1.0f, 1.0f}}, // 8
+            {{0.5f,  -0.5f, 0.5f},  {1.0f, 0.32f, 0.32f}, {1.0f, 0.0f}}, // 9
+            {{0.5f,  -0.5f, -0.5f}, {1.0f, 0.29f, 0.14f}, {0.0f, 0.0f}}, // 10
+            {{0.5f,  0.5f,  -0.5f}, {1.0f, 0.32f, 0.32f}, {0.0f, 1.0f}}, // 11
+
+            // Left face
+            {{-0.5f, 0.5f,  0.5f},  {1.0f, 0.0f,  0.0f},  {1.0f, 1.0f}}, // 12
+            {{-0.5f, -0.5f, 0.5f},  {1.0f, 0.32f, 0.32f}, {1.0f, 0.0f}}, // 13
+            {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.29f, 0.14f}, {0.0f, 0.0f}}, // 14
+            {{-0.5f, 0.5f,  -0.5f}, {1.0f, 0.32f, 0.32f}, {0.0f, 1.0f}}, // 15
+
+            // Top face
+            {{0.5f,  0.5f,  0.5f},  {1.0f, 0.0f,  0.0f},  {1.0f, 1.0f}}, // 16
+            {{0.5f,  0.5f,  -0.5f}, {1.0f, 0.32f, 0.32f}, {1.0f, 0.0f}}, // 17
+            {{-0.5f, 0.5f,  -0.5f}, {1.0f, 0.29f, 0.14f}, {0.0f, 0.0f}}, // 18
+            {{-0.5f, 0.5f,  0.5f},  {1.0f, 0.32f, 0.32f}, {0.0f, 1.0f}}, // 19
+
+            // Bottom face
+            {{0.5f,  -0.5f, 0.5f},  {1.0f, 0.0f,  0.0f},  {1.0f, 1.0f}}, // 20
+            {{0.5f,  -0.5f, -0.5f}, {1.0f, 0.32f, 0.32f}, {1.0f, 0.0f}}, // 21
+            {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.29f, 0.14f}, {0.0f, 0.0f}}, // 22
+            {{-0.5f, -0.5f, 0.5f},  {1.0f, 0.32f, 0.32f}, {0.0f, 1.0f}}  // 23
     };
 
     const std::vector<uint16_t> indices{
+            // Front face
             0, 1, 2,
             2, 3, 0,
 
-            4, 5, 6,
-            6, 7, 4
+            // Back face
+            6, 5, 4,
+            4, 7, 6,
+
+            // Right face
+            10, 9, 8,
+            8, 11, 10,
+
+            // Left face
+            12, 13, 14,
+            14, 15, 12,
+
+            // Top face
+            18, 17, 16,
+            16, 19, 18,
+
+            // Bottom face
+            20, 21, 22,
+            22, 23, 20
     };
 
 #pragma region APPLICATION
@@ -385,20 +429,20 @@ namespace Haus {
                 .layout = vk::ImageLayout::eColorAttachmentOptimal
         };
 
-        vk::AttachmentDescription depthAttachment {
-            .format = vk::Format::eD32Sfloat,
-            .samples = vk::SampleCountFlagBits::e1,
-            .loadOp = vk::AttachmentLoadOp::eClear,
-            .storeOp = vk::AttachmentStoreOp::eDontCare,
-            .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
-            .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
-            .initialLayout = vk::ImageLayout::eUndefined,
-            .finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal
+        vk::AttachmentDescription depthAttachment{
+                .format = vk::Format::eD32Sfloat,
+                .samples = vk::SampleCountFlagBits::e1,
+                .loadOp = vk::AttachmentLoadOp::eClear,
+                .storeOp = vk::AttachmentStoreOp::eDontCare,
+                .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+                .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+                .initialLayout = vk::ImageLayout::eUndefined,
+                .finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal
         };
 
         vk::AttachmentReference depthAttachmentReference{
-            .attachment = 1,
-            .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal
+                .attachment = 1,
+                .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal
         };
 
         vk::SubpassDescription subpass{
@@ -411,10 +455,13 @@ namespace Haus {
         vk::SubpassDependency dependency{
                 .srcSubpass = VK_SUBPASS_EXTERNAL,
                 .dstSubpass = 0,
-                .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
-                .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
+                .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput |
+                                vk::PipelineStageFlagBits::eEarlyFragmentTests,
+                .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput |
+                                vk::PipelineStageFlagBits::eEarlyFragmentTests,
                 .srcAccessMask = vk::AccessFlagBits::eNone,
-                .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite
+                .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite |
+                                 vk::AccessFlagBits::eDepthStencilAttachmentWrite
         };
 
         std::array<vk::AttachmentDescription, 2> attachments = {
@@ -578,13 +625,13 @@ namespace Haus {
         };
 
         vk::PipelineDepthStencilStateCreateInfo depthStencil{
-            .depthTestEnable = vk::True,
-            .depthWriteEnable = vk::True,
-            .depthCompareOp = vk::CompareOp::eLess,
-            .depthBoundsTestEnable = vk::False,
-            .stencilTestEnable = vk::False,
-            .minDepthBounds = 0.0f,
-            .maxDepthBounds = 1.0f
+                .depthTestEnable = vk::True,
+                .depthWriteEnable = vk::True,
+                .depthCompareOp = vk::CompareOp::eLess,
+                .depthBoundsTestEnable = vk::False,
+                .stencilTestEnable = vk::False,
+                .minDepthBounds = 0.0f,
+                .maxDepthBounds = 1.0f
         };
 
         if (m_Device.createPipelineLayout(&pipelineLayoutInfo, nullptr, &m_PipelineLayout) != vk::Result::eSuccess)
@@ -898,9 +945,11 @@ namespace Haus {
 
             sourceStage = vk::PipelineStageFlagBits::eTransfer;
             destinationStage = vk::PipelineStageFlagBits::eFragmentShader;
-        } else if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eDepthStencilAttachmentOptimal) {
+        } else if (oldLayout == vk::ImageLayout::eUndefined &&
+                   newLayout == vk::ImageLayout::eDepthStencilAttachmentOptimal) {
             barrier.srcAccessMask = vk::AccessFlagBits::eNone;
-            barrier.dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+            barrier.dstAccessMask =
+                    vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite;
 
             sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
             destinationStage = vk::PipelineStageFlagBits::eEarlyFragmentTests;
@@ -1136,13 +1185,13 @@ namespace Haus {
         if (commandBuffer.begin(&beginInfo) != vk::Result::eSuccess)
             throw std::runtime_error("Failed to begin recording command buffer");
 
-        std::array<vk::ClearValue, 2> clearValues {
-            m_ClearColor,
-            vk::ClearValue {
-                    .depthStencil {
-                        1.0f, 0
-                    }
-            }
+        std::array<vk::ClearValue, 2> clearValues{
+                m_ClearColor,
+                vk::ClearValue{
+                        .depthStencil {
+                                1.0f, 0
+                        }
+                }
         };
 
         vk::RenderPassBeginInfo renderPassInfo{
@@ -1259,7 +1308,7 @@ namespace Haus {
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
         UniformBufferObject uniformBufferObject{
-                .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+                .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 1.0f)),
                 .view = glm::lookAt(glm::vec3(0.0f, -2.5f, 2.0f),
                                     glm::vec3(0.0f, 0.0f, 0.0f),
                                     glm::vec3(0.0f, 1.0f, 0.0f)),
