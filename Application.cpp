@@ -615,7 +615,13 @@ namespace Haus {
         };
 
         vk::PipelineColorBlendAttachmentState colorBlendAttachment{
-                .blendEnable = VK_FALSE,
+                .blendEnable = VK_TRUE,
+                .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+                .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+                .colorBlendOp = vk::BlendOp::eAdd,
+                .srcAlphaBlendFactor = vk::BlendFactor::eOne,
+                .dstAlphaBlendFactor = vk::BlendFactor::eZero,
+                .alphaBlendOp = vk::BlendOp::eAdd,
                 .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
                                   | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
         };
@@ -830,7 +836,7 @@ namespace Haus {
     void Application::CreateTextureImage() {
         stbi_set_flip_vertically_on_load(true);
         int width, height, channels;
-        stbi_uc *pixels = stbi_load("textures/cat.png", &width, &height, &channels, STBI_rgb_alpha);
+        stbi_uc *pixels = stbi_load("textures/grass.png", &width, &height, &channels, STBI_rgb_alpha);
         vk::DeviceSize imageSize = width * height * 4;
 
         if (!pixels)
