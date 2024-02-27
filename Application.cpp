@@ -252,8 +252,8 @@ namespace Haus {
                 .ppEnabledExtensionNames = extensions
         };
 
-        m_Instance = vk::createInstance(createInfo);
-        if (!m_Instance)
+        vk::Result result = vk::createInstance(&createInfo, nullptr, &m_Instance);
+        if (result != vk::Result::eSuccess)
             throw std::runtime_error("Failed to create Instance");
     }
 
