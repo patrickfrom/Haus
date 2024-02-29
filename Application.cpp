@@ -1420,7 +1420,7 @@ namespace Haus {
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
         glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) *
-                          glm::rotate(glm::mat4(1.0f), (time * 0.5f) * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f))
+                          glm::rotate(glm::mat4(1.0f), glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f))
                           * glm::scale(glm::mat4(1.0f), glm::vec3(0.5f, 0.5f, 0.5f));
         UniformBufferObject uniformBufferObject{
                 .model = model,

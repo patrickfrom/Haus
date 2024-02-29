@@ -11,7 +11,7 @@ int main() {
     Haus::Application app{specification};
 
     try {
-        app.SetClearColor(glm::vec4(0.5f, 0.25f, 1.0f, 1.0f));
+        app.SetClearColor(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
         app.Run();
     } catch (std::exception &exception) {
         std::cerr << exception.what() << std::endl;

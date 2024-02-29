@@ -22,8 +22,8 @@ void main() {
     vec3 halfwayDirection = normalize(lightDirection + viewDirection);
     float spec = pow(max(dot(normal, halfwayDirection), 0.0), 8.0);
 
-    vec4 ambient = vec4(0.5, 0.5, 0.5, 1.0) * texture(textureSampler, textureCoord);
-    vec4 diffuse = vec4(1.0, 1.0, 1.0, 1.0) * diff * texture(textureSampler, textureCoord) * 4.0;
+    vec4 ambient = vec4(0.025, 0.025, 0.025, 1.0) * texture(textureSampler, textureCoord);
+    vec4 diffuse = vec4(1.0, 1.0, 1.0, 1.0) * diff * texture(textureSampler, textureCoord);
     vec4 specular = vec4(1.0, 1.0, 1.0, 1.0) * spec * texture(textureSampler, textureCoord);
 
     FragColor = ambient + diffuse + specular;
