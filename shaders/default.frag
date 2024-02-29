@@ -11,7 +11,7 @@ layout (binding = 1) uniform sampler2D textureSampler;
 
 void main() {
     vec3 norm = normalize(normal);
-    vec3 viewDirection = normalize(vec3(0.0f, -2.5f, 2.0f) - fragPos);
+    vec3 viewDirection = normalize(vec3(0.0f, 0.0f, 3.0f) - fragPos);
 
     vec3 lightDirection = normalize(-vec3(-0.2f, -1.0f, -0.3f));
 
@@ -26,5 +26,5 @@ void main() {
     vec4 diffuse = vec4(1.0, 1.0, 1.0, 1.0) * diff * texture(textureSampler, textureCoord) * 4.0;
     vec4 specular = vec4(1.0, 1.0, 1.0, 1.0) * spec * texture(textureSampler, textureCoord);
 
-    FragColor = ambient + diffuse;
+    FragColor = ambient + diffuse + specular;
 }

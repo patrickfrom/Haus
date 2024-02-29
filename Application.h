@@ -122,7 +122,7 @@ namespace Haus {
 
         uint32_t m_MinImageCount;
 
-        vk::ImageView CreateImageView(vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags);
+        vk::ImageView CreateImageView(vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags, uint32_t mipLevels);
 
         SwapChainSupportDetails QuerySwapChainSupport(vk::PhysicalDevice device);
 
@@ -149,11 +149,13 @@ namespace Haus {
 
         void CopyBufferToImage(vk::Buffer buffer, vk::Image image, uint32_t width, uint32_t height);
 
-        void CreateImage(uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling,
+        void CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, vk::Format format, vk::ImageTiling tiling,
                          vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Image &image,
                          vk::DeviceMemory &imageMemory);
 
-        void TransitionImageLayout(vk::Image image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout);
+        void TransitionImageLayout(vk::Image image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, uint32_t mipLevels);
+
+        void GenerateMipmaps(vk::Image image, int32_t width, int32_t height, uint32_t mipLevels);
 
         void CleanupSwapchain();
 
@@ -252,10 +254,11 @@ namespace Haus {
         vk::DescriptorPool m_DescriptorPool;
         std::vector<vk::DescriptorSet> m_DescriptorSets;
 
-        vk::Image m_CatImage;
-        vk::ImageView m_CatImageView;
-        vk::Sampler m_CatSampler;
-        vk::DeviceMemory m_CatImageMemory;
+        uint32_t m_MipLevels;
+        vk::Image m_TextureImage;
+        vk::ImageView m_TextureImageView;
+        vk::Sampler m_TextureSampler;
+        vk::DeviceMemory m_TextureImageMemory;
 
         vk::Image m_DepthImage;
         vk::ImageView m_DepthImageView;

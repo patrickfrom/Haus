@@ -427,7 +427,7 @@ namespace Haus {
 
         for (size_t i = 0; i < m_SwapchainImages.size(); i++) {
             m_SwapchainImageViews[i] = CreateImageView(m_SwapchainImages[i], m_SwapchainImageFormat,
-                                                       vk::ImageAspectFlagBits::eColor);
+                                                       vk::ImageAspectFlagBits::eColor, 1);
         }
     }
 
@@ -738,13 +738,13 @@ namespace Haus {
     }
 
     void Application::CreateDepthResources() {
-        CreateImage(m_SwapchainExtent.width, m_SwapchainExtent.height, vk::Format::eD32Sfloat,
+        CreateImage(m_SwapchainExtent.width, m_SwapchainExtent.height, 1, vk::Format::eD32Sfloat,
                     vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment,
                     vk::MemoryPropertyFlagBits::eDeviceLocal, m_DepthImage, m_DepthImageMemory);
-        m_DepthImageView = CreateImageView(m_DepthImage, vk::Format::eD32Sfloat, vk::ImageAspectFlagBits::eDepth);
+        m_DepthImageView = CreateImageView(m_DepthImage, vk::Format::eD32Sfloat, vk::ImageAspectFlagBits::eDepth, 1);
 
         TransitionImageLayout(m_DepthImage, vk::Format::eD32Sfloat, vk::ImageLayout::eUndefined,
-                              vk::ImageLayout::eDepthStencilAttachmentOptimal);
+                              vk::ImageLayout::eDepthStencilAttachmentOptimal, 1);
     }
 
     vk::CommandBuffer Application::BeginSingleTimeCommands() {
@@ -807,7 +807,8 @@ namespace Haus {
         EndSingleTimeCommands(commandBuffer);
     }
 
-    void Application::CreateImage(uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling,
+    void Application::CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, vk::Format format,
+                                  vk::ImageTiling tiling,
                                   vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Image &image,
                                   vk::DeviceMemory &imageMemory) {
         vk::ImageCreateInfo imageInfo{
@@ -818,7 +819,7 @@ namespace Haus {
                         .height = static_cast<uint32_t>(height),
                         .depth = 1
                 },
-                .mipLevels = 1,
+                .mipLevels = mipLevels,
                 .arrayLayers = 1,
                 .samples = vk::SampleCountFlagBits::e1,
                 .tiling = tiling,
@@ -848,6 +849,7 @@ namespace Haus {
         stbi_set_flip_vertically_on_load(true);
         int width, height, channels;
         stbi_uc *pixels = stbi_load("models/Moon/Textures/Diffuse_2K.png", &width, &height, &channels, STBI_rgb_alpha);
+        m_MipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
         vk::DeviceSize imageSize = width * height * 4;
 
         if (!pixels)
@@ -866,21 +868,105 @@ namespace Haus {
 
         stbi_image_free(pixels);
 
-        CreateImage(width, height, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal,
-                    vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
-                    vk::MemoryPropertyFlagBits::eDeviceLocal, m_CatImage, m_CatImageMemory);
+        CreateImage(width, height, m_MipLevels, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal,
+                    vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst |
+                    vk::ImageUsageFlagBits::eSampled,
+                    vk::MemoryPropertyFlagBits::eDeviceLocal, m_TextureImage, m_TextureImageMemory);
 
-        TransitionImageLayout(m_CatImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined,
-                              vk::ImageLayout::eTransferDstOptimal);
-        CopyBufferToImage(stagingBuffer, m_CatImage, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-        TransitionImageLayout(m_CatImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eTransferDstOptimal,
-                              vk::ImageLayout::eShaderReadOnlyOptimal);
+        TransitionImageLayout(m_TextureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined,
+                              vk::ImageLayout::eTransferDstOptimal, m_MipLevels);
+        CopyBufferToImage(stagingBuffer, m_TextureImage, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+
+        GenerateMipmaps(m_TextureImage, width, height, m_MipLevels);
 
         m_Device.destroyBuffer(stagingBuffer);
         m_Device.freeMemory(stagingBufferMemory);
     }
 
-    vk::ImageView Application::CreateImageView(vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags) {
+    void Application::GenerateMipmaps(vk::Image image, int32_t width, int32_t height, uint32_t mipLevels) {
+        vk::CommandBuffer commandBuffer = BeginSingleTimeCommands();
+
+        vk::ImageMemoryBarrier barrier{};
+        barrier.image = image;
+        barrier.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+        barrier.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+        barrier.subresourceRange = {
+                .aspectMask = vk::ImageAspectFlagBits::eColor,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+        };
+
+        int32_t mipWidth = width;
+        int32_t mipHeight = height;
+
+        for (uint32_t i = 1; i < mipLevels; i++) {
+            barrier.subresourceRange.baseMipLevel = i - 1;
+            barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+            barrier.newLayout = vk::ImageLayout::eTransferSrcOptimal;
+            barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+            barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+
+            commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer,
+                                          vk::DependencyFlagBits::eByRegion,
+                                          0, nullptr,
+                                          0, nullptr,
+                                          1, &barrier);
+
+            vk::ImageBlit blit{};
+            blit.srcOffsets = {{{{}, {static_cast<int32_t>(mipWidth), static_cast<int32_t>(mipHeight), 1}}}};
+            blit.srcSubresource = {
+                    .aspectMask = vk::ImageAspectFlagBits::eColor,
+                    .mipLevel = i - 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+            };
+            blit.dstOffsets = {{{{}, {mipWidth / 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1}}}};
+            blit.dstSubresource = {
+                    .aspectMask = vk::ImageAspectFlagBits::eColor,
+                    .mipLevel = i,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+            };
+
+            commandBuffer.blitImage(image, vk::ImageLayout::eTransferSrcOptimal,
+                                    image, vk::ImageLayout::eTransferDstOptimal,
+                                    1, &blit, vk::Filter::eLinear);
+
+            barrier.oldLayout = vk::ImageLayout::eTransferSrcOptimal;
+            barrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+            barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
+            barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+
+            commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                          vk::PipelineStageFlagBits::eFragmentShader,
+                                          vk::DependencyFlagBits::eByRegion,
+                                          0, nullptr,
+                                          0, nullptr,
+                                          1, &barrier);
+
+            if (mipWidth > 1) mipWidth /= 2;
+            if (mipHeight > 1) mipHeight /= 2;
+        }
+
+        barrier.subresourceRange.baseMipLevel = mipLevels - 1;
+        barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+        barrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+        barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+
+        commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                      vk::PipelineStageFlagBits::eFragmentShader,
+                                      vk::DependencyFlagBits::eByRegion,
+                                      0, nullptr,
+                                      0, nullptr,
+                                      1, &barrier);
+
+        EndSingleTimeCommands(commandBuffer);
+    }
+
+    vk::ImageView Application::CreateImageView(vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags,
+                                               uint32_t mipLevels) {
         vk::ImageViewCreateInfo viewInfo{
                 .image = image,
                 .viewType = vk::ImageViewType::e2D,
@@ -888,7 +974,7 @@ namespace Haus {
                 .subresourceRange {
                         .aspectMask = aspectFlags,
                         .baseMipLevel = 0,
-                        .levelCount = 1,
+                        .levelCount = mipLevels,
                         .baseArrayLayer = 0,
                         .layerCount = 1
                 }
@@ -902,7 +988,8 @@ namespace Haus {
     }
 
     void Application::CreateTextureImageView() {
-        m_CatImageView = CreateImageView(m_CatImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
+        m_TextureImageView = CreateImageView(m_TextureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor,
+                                             m_MipLevels);
     }
 
     void Application::CreateTextureSampler() {
@@ -921,17 +1008,17 @@ namespace Haus {
                 .compareEnable = vk::False,
                 .compareOp = vk::CompareOp::eAlways,
                 .minLod = 0.0f,
-                .maxLod = 0.0f,
+                .maxLod = static_cast<float>(m_MipLevels),
                 .borderColor = vk::BorderColor::eIntOpaqueBlack,
                 .unnormalizedCoordinates = vk::False,
         };
 
-        if (m_Device.createSampler(&samplerInfo, nullptr, &m_CatSampler) != vk::Result::eSuccess)
+        if (m_Device.createSampler(&samplerInfo, nullptr, &m_TextureSampler) != vk::Result::eSuccess)
             throw std::runtime_error("Failed to create texture sampler");
     }
 
     void Application::TransitionImageLayout(vk::Image image, vk::Format format, vk::ImageLayout oldLayout,
-                                            vk::ImageLayout newLayout) {
+                                            vk::ImageLayout newLayout, uint32_t mipLevels) {
         vk::CommandBuffer commandBuffer = BeginSingleTimeCommands();
 
         vk::ImageMemoryBarrier barrier{
@@ -942,7 +1029,7 @@ namespace Haus {
                 .image = image,
                 .subresourceRange {
                         .baseMipLevel = 0,
-                        .levelCount = 1,
+                        .levelCount = mipLevels,
                         .baseArrayLayer = 0,
                         .layerCount = 1
                 },
@@ -1141,8 +1228,8 @@ namespace Haus {
             };
 
             vk::DescriptorImageInfo imageInfo{
-                    .sampler = m_CatSampler,
-                    .imageView = m_CatImageView,
+                    .sampler = m_TextureSampler,
+                    .imageView = m_TextureImageView,
                     .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
             };
 
@@ -1332,12 +1419,13 @@ namespace Haus {
         auto currentTime = std::chrono::high_resolution_clock::now();
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
-        glm::mat4 model = glm::rotate(glm::mat4(1.0f), (time * 0.5f) * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f))
-                * glm::scale(glm::mat4(1.0f), glm::vec3(0.5f, 0.5f, 0.5f));
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) *
+                          glm::rotate(glm::mat4(1.0f), (time * 0.5f) * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f))
+                          * glm::scale(glm::mat4(1.0f), glm::vec3(0.5f, 0.5f, 0.5f));
         UniformBufferObject uniformBufferObject{
                 .model = model,
-                .view = glm::lookAt(glm::vec3(0.0f, -2.5f, 2.0f),
-                                    glm::vec3(0.0f, 0.0f, 0.0f),
+                .view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f),
+                                    glm::vec3(0.0f, 0.0f, 3.0f) + glm::vec3(0.0f, 0.0f, -3.0f),
                                     glm::vec3(0.0f, 1.0f, 0.0f)),
                 .projection = glm::perspective(glm::radians(45.0f),
                                                (float) m_SwapchainExtent.width / (float) m_SwapchainExtent.height, 0.1f,
@@ -1360,10 +1448,10 @@ namespace Haus {
         m_Device.destroyDescriptorPool(m_DescriptorPool);
         m_Device.destroyDescriptorSetLayout(m_DescriptorSetLayout);
 
-        m_Device.destroySampler(m_CatSampler);
-        m_Device.destroyImageView(m_CatImageView);
-        m_Device.destroyImage(m_CatImage);
-        m_Device.freeMemory(m_CatImageMemory);
+        m_Device.destroySampler(m_TextureSampler);
+        m_Device.destroyImageView(m_TextureImageView);
+        m_Device.destroyImage(m_TextureImage);
+        m_Device.freeMemory(m_TextureImageMemory);
 
         m_Device.destroyBuffer(m_IndexBuffer);
         m_Device.freeMemory(m_IndexBufferMemory);
