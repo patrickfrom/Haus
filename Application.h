@@ -5,8 +5,77 @@
 #include <vulkan/vulkan.hpp>
 #include <GLFW/glfw3.h>
 #include "glm/vec4.hpp"
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
+struct Vertex {
+    glm::vec3 Position;
+    glm::vec3 Color;
+    glm::vec2 TextureCoord;
+    glm::vec3 Normal;
+
+    static vk::VertexInputBindingDescription GetBindingDescription() {
+        vk::VertexInputBindingDescription bindingDescription{
+                .binding = 0,
+                .stride = sizeof(Vertex),
+                .inputRate = vk::VertexInputRate::eVertex
+        };
+
+        return bindingDescription;
+    }
+
+    static std::array<vk::VertexInputAttributeDescription, 4> GetAttributeDescriptions() {
+        std::array<vk::VertexInputAttributeDescription, 4> attributeDescription{
+                vk::VertexInputAttributeDescription{
+                        .location = 0,
+                        .binding = 0,
+                        .format = vk::Format::eR32G32B32Sfloat,
+                        .offset = offsetof(Vertex, Position)
+                },
+                vk::VertexInputAttributeDescription{
+                        .location = 1,
+                        .binding = 0,
+                        .format = vk::Format::eR32G32B32Sfloat,
+                        .offset = offsetof(Vertex, Color)
+                },
+                vk::VertexInputAttributeDescription{
+                        .location = 2,
+                        .binding = 0,
+                        .format = vk::Format::eR32G32Sfloat,
+                        .offset = offsetof(Vertex, TextureCoord)
+                },
+                vk::VertexInputAttributeDescription{
+                        .location = 3,
+                        .binding = 0,
+                        .format = vk::Format::eR32G32B32Sfloat,
+                        .offset = offsetof(Vertex, Normal)
+                }
+        };
+
+        return attributeDescription;
+    }
+
+    bool operator==(const Vertex &other) const {
+        return Position == other.Position && Color == other.Color && TextureCoord == other.TextureCoord;
+    }
+};
+
+namespace std {
+    template<> struct hash<Vertex> {
+        size_t operator()(Vertex const& vertex) const {
+            return ((hash<glm::vec3>()(vertex.Position) ^
+                     (hash<glm::vec3>()(vertex.Color) << 1)) >> 1) ^
+                   (hash<glm::vec2>()(vertex.TextureCoord) << 1);
+        }
+    };
+}
 
 namespace Haus {
+
     struct ApplicationSpecification {
         std::string Name;
         int Width;
@@ -73,6 +142,8 @@ namespace Haus {
         void CopyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size);
 
         vk::CommandBuffer BeginSingleTimeCommands();
+
+        void LoadModel();
 
         void EndSingleTimeCommands(vk::CommandBuffer commandBuffer);
 
@@ -166,6 +237,8 @@ namespace Haus {
         std::vector<vk::Semaphore> m_RenderFinishedSemaphores;
         std::vector<vk::Fence> m_InFlightFences;
 
+        std::vector<Vertex> vertices;
+        std::vector<uint32_t> indices;
         vk::Buffer m_VertexBuffer;
         vk::DeviceMemory m_VertexBufferMemory;
 

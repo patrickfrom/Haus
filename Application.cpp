@@ -4,15 +4,15 @@
 #include <fstream>
 #include <chrono>
 
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
 #define STB_IMAGE_IMPLEMENTATION
 
 #include <stb/image.h>
+
+#define TINYOBJLOADER_IMPLEMENTATION
+
+#include <tiny_obj_loader.h>
+
+#include <unordered_map>
 
 /* Currently using regions, just so it's easier for me to
    see what's going on since I don't want to abstract
@@ -25,55 +25,8 @@ namespace Haus {
         glm::mat3 normalInverse;
     };
 
-    struct Vertex {
-        glm::vec3 Position;
-        glm::vec3 Color;
-        glm::vec2 TextureCoord;
-        glm::vec3 Normal;
 
-        static vk::VertexInputBindingDescription GetBindingDescription() {
-            vk::VertexInputBindingDescription bindingDescription{
-                    .binding = 0,
-                    .stride = sizeof(Vertex),
-                    .inputRate = vk::VertexInputRate::eVertex
-            };
-
-            return bindingDescription;
-        }
-
-        static std::array<vk::VertexInputAttributeDescription, 4> GetAttributeDescriptions() {
-            std::array<vk::VertexInputAttributeDescription, 4> attributeDescription{
-                    vk::VertexInputAttributeDescription{
-                            .location = 0,
-                            .binding = 0,
-                            .format = vk::Format::eR32G32B32Sfloat,
-                            .offset = offsetof(Vertex, Position)
-                    },
-                    vk::VertexInputAttributeDescription{
-                            .location = 1,
-                            .binding = 0,
-                            .format = vk::Format::eR32G32B32Sfloat,
-                            .offset = offsetof(Vertex, Color)
-                    },
-                    vk::VertexInputAttributeDescription{
-                            .location = 2,
-                            .binding = 0,
-                            .format = vk::Format::eR32G32Sfloat,
-                            .offset = offsetof(Vertex, TextureCoord)
-                    },
-                    vk::VertexInputAttributeDescription{
-                            .location = 3,
-                            .binding = 0,
-                            .format = vk::Format::eR32G32B32Sfloat,
-                            .offset = offsetof(Vertex, Normal)
-                    }
-            };
-
-            return attributeDescription;
-        }
-    };
-
-    const std::vector<Vertex> vertices = {
+    /*const std::vector<Vertex> vertices = {
             // Front face
             {{0.5f,  0.5f,  0.5f},  {1.0f, 0.0f,  0.0f},  {1.0f, 1.0f}, {0.0f,  0.0f,  1.0f}}, // 0
             {{0.5f,  -0.5f, 0.5f},  {1.0f, 0.32f, 0.32f}, {1.0f, 0.0f}, {0.0f,  0.0f,  1.0f}}, // 1
@@ -135,7 +88,7 @@ namespace Haus {
             // Bottom face
             20, 21, 22,
             22, 23, 20
-    };
+    };*/
 
 #pragma region APPLICATION
 
@@ -223,6 +176,7 @@ namespace Haus {
         CreateTextureImage();
         CreateTextureImageView();
         CreateTextureSampler();
+        LoadModel();
         CreateVertexBuffer();
         CreateIndexBuffer();
         CreateUniformBuffers();
@@ -230,6 +184,63 @@ namespace Haus {
         CreateDescriptorSets();
         CreateCommandBuffers();
         CreateSyncObjects();
+    }
+
+    void Application::LoadModel() {
+        std::string modelFile = "models/Moon/Moon 2K.obj";
+        tinyobj::ObjReader reader;
+
+        tinyobj::ObjReaderConfig config{};
+        config.triangulate = true;
+        config.mtl_search_path = "models/Moon";
+
+        if (!reader.ParseFromFile(modelFile, config)) {
+            if (!reader.Error().empty()) {
+                std::cerr << "TinyObjReader: " << reader.Error();
+            }
+            exit(1);
+        }
+
+        if (!reader.Warning().empty()) {
+            std::cout << "TinyObjReader: " << reader.Warning();
+        }
+
+        auto &attrib = reader.GetAttrib();
+        auto &shapes = reader.GetShapes();
+        auto &materials = reader.GetMaterials();
+
+        std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+
+        for (const auto &shape: shapes) {
+            for (const auto &index: shape.mesh.indices) {
+                Vertex vertex{};
+                vertex.Position = {
+                        attrib.vertices[3 * index.vertex_index + 0],
+                        attrib.vertices[3 * index.vertex_index + 1],
+                        attrib.vertices[3 * index.vertex_index + 2],
+                };
+
+                vertex.Normal = {
+                        attrib.normals[3 * index.normal_index + 0],
+                        attrib.normals[3 * index.normal_index + 1],
+                        attrib.normals[3 * index.normal_index + 2],
+                };
+
+                vertex.TextureCoord = {
+                        attrib.texcoords[2 * index.texcoord_index + 0],
+                        attrib.texcoords[2 * index.texcoord_index + 1],
+                };
+
+                vertex.Color = {1.0f, 1.0f, 1.0f};
+
+                if (uniqueVertices.count(vertex) == 0) {
+                    uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+                    vertices.push_back(vertex);
+                }
+
+                indices.push_back(uniqueVertices[vertex]);
+            }
+        }
     }
 
     void Application::CreateInstance() {
@@ -604,7 +615,7 @@ namespace Haus {
                 .rasterizerDiscardEnable = VK_FALSE,
                 .polygonMode = vk::PolygonMode::eFill,
                 .cullMode = vk::CullModeFlagBits::eBack,
-                .frontFace = vk::FrontFace::eClockwise,
+                .frontFace = vk::FrontFace::eCounterClockwise,
                 .depthBiasEnable = VK_FALSE,
                 .lineWidth = 1.0f
         };
@@ -836,7 +847,7 @@ namespace Haus {
     void Application::CreateTextureImage() {
         stbi_set_flip_vertically_on_load(true);
         int width, height, channels;
-        stbi_uc *pixels = stbi_load("textures/grass.png", &width, &height, &channels, STBI_rgb_alpha);
+        stbi_uc *pixels = stbi_load("models/Moon/Textures/Diffuse_2K.png", &width, &height, &channels, STBI_rgb_alpha);
         vk::DeviceSize imageSize = width * height * 4;
 
         if (!pixels)
@@ -1247,7 +1258,7 @@ namespace Haus {
         vk::Buffer vertexBuffers[] = {m_VertexBuffer};
         vk::DeviceSize offsets[] = {0};
         commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
-        commandBuffer.bindIndexBuffer(m_IndexBuffer, 0, vk::IndexType::eUint16);
+        commandBuffer.bindIndexBuffer(m_IndexBuffer, 0, vk::IndexType::eUint32);
 
         commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_PipelineLayout, 0, 1,
                                          &m_DescriptorSets[m_CurrentFrame], 0, nullptr);
@@ -1321,8 +1332,10 @@ namespace Haus {
         auto currentTime = std::chrono::high_resolution_clock::now();
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
+        glm::mat4 model = glm::rotate(glm::mat4(1.0f), (time * 0.5f) * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f))
+                * glm::scale(glm::mat4(1.0f), glm::vec3(0.5f, 0.5f, 0.5f));
         UniformBufferObject uniformBufferObject{
-                .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 1.0f)),
+                .model = model,
                 .view = glm::lookAt(glm::vec3(0.0f, -2.5f, 2.0f),
                                     glm::vec3(0.0f, 0.0f, 0.0f),
                                     glm::vec3(0.0f, 1.0f, 0.0f)),
