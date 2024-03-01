@@ -5,13 +5,17 @@
 #include <vulkan/vulkan.hpp>
 #include <GLFW/glfw3.h>
 #include "glm/vec4.hpp"
+
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #define GLM_ENABLE_EXPERIMENTAL
+
 #include <glm/gtx/hash.hpp>
+
 struct Vertex {
     glm::vec3 Position;
     glm::vec3 Color;
@@ -65,8 +69,9 @@ struct Vertex {
 };
 
 namespace std {
-    template<> struct hash<Vertex> {
-        size_t operator()(Vertex const& vertex) const {
+    template<>
+    struct hash<Vertex> {
+        size_t operator()(Vertex const &vertex) const {
             return ((hash<glm::vec3>()(vertex.Position) ^
                      (hash<glm::vec3>()(vertex.Color) << 1)) >> 1) ^
                    (hash<glm::vec2>()(vertex.TextureCoord) << 1);
@@ -107,6 +112,7 @@ namespace Haus {
         void CleanupGLFW();
 
         static void FramebufferResizeCallback(GLFWwindow *window, int width, int height);
+
         static void KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
 
         GLFWwindow *m_Window;
@@ -122,7 +128,8 @@ namespace Haus {
 
         uint32_t m_MinImageCount;
 
-        vk::ImageView CreateImageView(vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags, uint32_t mipLevels);
+        vk::ImageView
+        CreateImageView(vk::Image image, vk::Format format, vk::ImageAspectFlags aspectFlags, uint32_t mipLevels);
 
         SwapChainSupportDetails QuerySwapChainSupport(vk::PhysicalDevice device);
 
@@ -143,17 +150,20 @@ namespace Haus {
 
         vk::CommandBuffer BeginSingleTimeCommands();
 
-        void LoadModel();
-
         void EndSingleTimeCommands(vk::CommandBuffer commandBuffer);
+
+        void LoadModel();
 
         void CopyBufferToImage(vk::Buffer buffer, vk::Image image, uint32_t width, uint32_t height);
 
-        void CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, vk::Format format, vk::ImageTiling tiling,
+        void CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, vk::SampleCountFlagBits numSamples,
+                         vk::Format format, vk::ImageTiling tiling,
                          vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Image &image,
                          vk::DeviceMemory &imageMemory);
 
-        void TransitionImageLayout(vk::Image image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, uint32_t mipLevels);
+        void
+        TransitionImageLayout(vk::Image image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout,
+                              uint32_t mipLevels);
 
         void GenerateMipmaps(vk::Image image, int32_t width, int32_t height, uint32_t mipLevels);
 
@@ -180,11 +190,15 @@ namespace Haus {
         void CreateDescriptorSetLayout();
 
         void CreateGraphicsPipeline();
-        void CreateWireframePipeline(vk::GraphicsPipelineCreateInfo& pipelineInfo, vk::PipelineRasterizationStateCreateInfo& rasterizer);
+
+        void CreateWireframePipeline(vk::GraphicsPipelineCreateInfo &pipelineInfo,
+                                     vk::PipelineRasterizationStateCreateInfo &rasterizer);
 
         void CreateFramebuffers();
 
         void CreateCommandPool();
+
+        void CreateColorResources();
 
         void CreateDepthResources();
 
@@ -209,6 +223,8 @@ namespace Haus {
         void CreateSyncObjects();
 
         void CleanupVulkan();
+
+        vk::SampleCountFlagBits GetMaxUsableSampleCount();
 
         bool m_WireframeEnabled = false;
 
@@ -254,11 +270,17 @@ namespace Haus {
         vk::DescriptorPool m_DescriptorPool;
         std::vector<vk::DescriptorSet> m_DescriptorSets;
 
+        vk::SampleCountFlagBits m_MsaaSamples = vk::SampleCountFlagBits::e1;
+
         uint32_t m_MipLevels;
         vk::Image m_TextureImage;
         vk::ImageView m_TextureImageView;
         vk::Sampler m_TextureSampler;
         vk::DeviceMemory m_TextureImageMemory;
+
+        vk::Image m_ColorImage;
+        vk::ImageView m_ColorImageView;
+        vk::DeviceMemory m_ColorImageMemory;
 
         vk::Image m_DepthImage;
         vk::ImageView m_DepthImageView;

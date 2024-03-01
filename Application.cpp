@@ -171,6 +171,7 @@ namespace Haus {
         CreateDescriptorSetLayout();
         CreateGraphicsPipeline();
         CreateCommandPool();
+        CreateColorResources();
         CreateDepthResources();
         CreateFramebuffers();
         CreateTextureImage();
@@ -288,6 +289,7 @@ namespace Haus {
         for (const auto &device: devices) {
             if (IsDeviceSuitable(device)) {
                 m_PhysicalDevice = device;
+                m_MsaaSamples = GetMaxUsableSampleCount();
                 break;
             }
         }
@@ -298,6 +300,7 @@ namespace Haus {
         vk::PhysicalDeviceProperties deviceProperties = m_PhysicalDevice.getProperties();
         std::cout << deviceProperties.deviceName << "\n";
         std::cout << to_string(deviceProperties.deviceType) << "\n";
+        std::cout << "MSAA: " << to_string(m_MsaaSamples) << std::endl;
     }
 
     void Application::CreateLogicalDevice() {
@@ -309,8 +312,9 @@ namespace Haus {
         };
 
         vk::PhysicalDeviceFeatures deviceFeatures{
+                .sampleRateShading = vk::True,
                 .fillModeNonSolid = vk::True,
-                .samplerAnisotropy = vk::True
+                .samplerAnisotropy = vk::True,
         };
 
         std::vector<const char *> enabledExtensions = {"VK_KHR_swapchain"};
@@ -368,13 +372,12 @@ namespace Haus {
         m_MinImageCount = imageCount;
 
         vk::SurfaceFormatKHR surfaceFormat = swapChainSupport.Formats[0];
-        for (auto format : swapChainSupport.Formats) {
+        for (auto format: swapChainSupport.Formats) {
             if (format.format == vk::Format::eB8G8R8A8Srgb && format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
                 surfaceFormat = format;
                 break;
             }
         }
-
 
         vk::SwapchainCreateInfoKHR createInfo{
                 .surface = m_Surface,
@@ -401,6 +404,10 @@ namespace Haus {
     }
 
     void Application::CleanupSwapchain() {
+        m_Device.destroyImageView(m_ColorImageView);
+        m_Device.destroyImage(m_ColorImage);
+        m_Device.freeMemory(m_ColorImageMemory);
+
         m_Device.destroyImageView(m_DepthImageView);
         m_Device.destroyImage(m_DepthImage);
         m_Device.freeMemory(m_DepthImageMemory);
@@ -427,6 +434,7 @@ namespace Haus {
 
         CreateSwapchain();
         CreateImageViews();
+        CreateColorResources();
         CreateDepthResources();
         CreateFramebuffers();
     }
@@ -443,23 +451,18 @@ namespace Haus {
     void Application::CreateRenderPass() {
         vk::AttachmentDescription colorAttachment{
                 .format = m_SwapchainImageFormat,
-                .samples = vk::SampleCountFlagBits::e1,
+                .samples = m_MsaaSamples,
                 .loadOp = vk::AttachmentLoadOp::eClear,
                 .storeOp = vk::AttachmentStoreOp::eStore,
                 .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
                 .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
                 .initialLayout = vk::ImageLayout::eUndefined,
-                .finalLayout = vk::ImageLayout::ePresentSrcKHR
-        };
-
-        vk::AttachmentReference colorAttachmentReference{
-                .attachment = 0,
-                .layout = vk::ImageLayout::eColorAttachmentOptimal
+                .finalLayout = vk::ImageLayout::eColorAttachmentOptimal
         };
 
         vk::AttachmentDescription depthAttachment{
                 .format = vk::Format::eD32Sfloat,
-                .samples = vk::SampleCountFlagBits::e1,
+                .samples = m_MsaaSamples,
                 .loadOp = vk::AttachmentLoadOp::eClear,
                 .storeOp = vk::AttachmentStoreOp::eDontCare,
                 .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
@@ -468,16 +471,37 @@ namespace Haus {
                 .finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal
         };
 
+        vk::AttachmentDescription colorAttachmentResolve{
+                .format = m_SwapchainImageFormat,
+                .samples = vk::SampleCountFlagBits::e1,
+                .loadOp = vk::AttachmentLoadOp::eDontCare,
+                .storeOp = vk::AttachmentStoreOp::eStore,
+                .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+                .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+                .initialLayout = vk::ImageLayout::eUndefined,
+                .finalLayout = vk::ImageLayout::ePresentSrcKHR,
+        };
+
+        vk::AttachmentReference colorAttachmentReference{
+                .attachment = 0,
+                .layout = vk::ImageLayout::eColorAttachmentOptimal
+        };
+
         vk::AttachmentReference depthAttachmentReference{
                 .attachment = 1,
                 .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal
         };
 
+        vk::AttachmentReference colorAttachmentResolveReference{};
+        colorAttachmentResolveReference.attachment = 2;
+        colorAttachmentResolveReference.layout = vk::ImageLayout::eColorAttachmentOptimal;
+
         vk::SubpassDescription subpass{
                 .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
                 .colorAttachmentCount = 1,
                 .pColorAttachments = &colorAttachmentReference,
-                .pDepthStencilAttachment = &depthAttachmentReference
+                .pResolveAttachments = &colorAttachmentResolveReference,
+                .pDepthStencilAttachment = &depthAttachmentReference,
         };
 
         vk::SubpassDependency dependency{
@@ -492,8 +516,8 @@ namespace Haus {
                                  vk::AccessFlagBits::eDepthStencilAttachmentWrite
         };
 
-        std::array<vk::AttachmentDescription, 2> attachments = {
-                colorAttachment, depthAttachment
+        std::array<vk::AttachmentDescription, 3> attachments = {
+                colorAttachment, depthAttachment, colorAttachmentResolve
         };
 
         vk::RenderPassCreateInfo renderPassInfo{
@@ -630,8 +654,9 @@ namespace Haus {
         };
 
         vk::PipelineMultisampleStateCreateInfo multisampling{
-                .rasterizationSamples = vk::SampleCountFlagBits::e1,
-                .sampleShadingEnable = VK_FALSE,
+                .rasterizationSamples = m_MsaaSamples,
+                .sampleShadingEnable = vk::True,
+                .minSampleShading = .2f
         };
 
         vk::PipelineColorBlendAttachmentState colorBlendAttachment{
@@ -716,9 +741,10 @@ namespace Haus {
         m_SwapchainFramebuffers.resize(m_SwapchainImageViews.size());
 
         for (size_t i = 0; i < m_SwapchainImageViews.size(); i++) {
-            std::array<vk::ImageView, 2> attachments = {
-                    m_SwapchainImageViews[i],
-                    m_DepthImageView
+            std::array<vk::ImageView, 3> attachments = {
+                    m_ColorImageView,
+                    m_DepthImageView,
+                    m_SwapchainImageViews[i]
             };
 
             vk::FramebufferCreateInfo framebufferInfo{
@@ -746,8 +772,19 @@ namespace Haus {
             throw std::runtime_error("Failed to create command pool");
     }
 
+    void Application::CreateColorResources() {
+        vk::Format format = m_SwapchainImageFormat;
+        CreateImage(m_SwapchainExtent.width, m_SwapchainExtent.height, 1, m_MsaaSamples, format,
+                    vk::ImageTiling::eOptimal,
+                    vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eColorAttachment,
+                    vk::MemoryPropertyFlagBits::eDeviceLocal, m_ColorImage, m_ColorImageMemory);
+
+        m_ColorImageView = CreateImageView(m_ColorImage, format, vk::ImageAspectFlagBits::eColor, 1);
+    }
+
     void Application::CreateDepthResources() {
-        CreateImage(m_SwapchainExtent.width, m_SwapchainExtent.height, 1, vk::Format::eD32Sfloat,
+        CreateImage(m_SwapchainExtent.width, m_SwapchainExtent.height, 1, m_MsaaSamples,
+                    vk::Format::eD32Sfloat,
                     vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment,
                     vk::MemoryPropertyFlagBits::eDeviceLocal, m_DepthImage, m_DepthImageMemory);
         m_DepthImageView = CreateImageView(m_DepthImage, vk::Format::eD32Sfloat, vk::ImageAspectFlagBits::eDepth, 1);
@@ -816,10 +853,12 @@ namespace Haus {
         EndSingleTimeCommands(commandBuffer);
     }
 
-    void Application::CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, vk::Format format,
-                                  vk::ImageTiling tiling,
-                                  vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Image &image,
-                                  vk::DeviceMemory &imageMemory) {
+    void
+    Application::CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, vk::SampleCountFlagBits numSamples,
+                             vk::Format format,
+                             vk::ImageTiling tiling,
+                             vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Image &image,
+                             vk::DeviceMemory &imageMemory) {
         vk::ImageCreateInfo imageInfo{
                 .imageType = vk::ImageType::e2D,
                 .format = format,
@@ -830,7 +869,7 @@ namespace Haus {
                 },
                 .mipLevels = mipLevels,
                 .arrayLayers = 1,
-                .samples = vk::SampleCountFlagBits::e1,
+                .samples = numSamples,
                 .tiling = tiling,
                 .usage = usage,
                 .sharingMode = vk::SharingMode::eExclusive,
@@ -877,7 +916,8 @@ namespace Haus {
 
         stbi_image_free(pixels);
 
-        CreateImage(width, height, m_MipLevels, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal,
+        CreateImage(width, height, m_MipLevels, vk::SampleCountFlagBits::e1, vk::Format::eR8G8B8A8Srgb,
+                    vk::ImageTiling::eOptimal,
                     vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst |
                     vk::ImageUsageFlagBits::eSampled,
                     vk::MemoryPropertyFlagBits::eDeviceLocal, m_TextureImage, m_TextureImageMemory);
@@ -1485,6 +1525,22 @@ namespace Haus {
         m_Device.destroy();
         m_Instance.destroySurfaceKHR(m_Surface);
         m_Instance.destroy();
+    }
+
+    vk::SampleCountFlagBits Application::GetMaxUsableSampleCount() {
+        vk::PhysicalDeviceProperties physicalDeviceProperties = m_PhysicalDevice.getProperties();
+
+        vk::SampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts &
+                                      physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+
+        if (counts & vk::SampleCountFlagBits::e64) { return vk::SampleCountFlagBits::e64; }
+        if (counts & vk::SampleCountFlagBits::e32) { return vk::SampleCountFlagBits::e32; }
+        if (counts & vk::SampleCountFlagBits::e16) { return vk::SampleCountFlagBits::e16; }
+        if (counts & vk::SampleCountFlagBits::e8) { return vk::SampleCountFlagBits::e8; }
+        if (counts & vk::SampleCountFlagBits::e4) { return vk::SampleCountFlagBits::e4; }
+        if (counts & vk::SampleCountFlagBits::e2) { return vk::SampleCountFlagBits::e2; }
+
+        return vk::SampleCountFlagBits::e1;
     }
 
 #pragma endregion VULKAN
