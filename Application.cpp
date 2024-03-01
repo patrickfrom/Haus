@@ -367,11 +367,20 @@ namespace Haus {
 
         m_MinImageCount = imageCount;
 
+        vk::SurfaceFormatKHR surfaceFormat = swapChainSupport.Formats[0];
+        for (auto format : swapChainSupport.Formats) {
+            if (format.format == vk::Format::eB8G8R8A8Srgb && format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
+                surfaceFormat = format;
+                break;
+            }
+        }
+
+
         vk::SwapchainCreateInfoKHR createInfo{
                 .surface = m_Surface,
                 .minImageCount = imageCount,
-                .imageFormat = swapChainSupport.Formats[0].format,
-                .imageColorSpace = swapChainSupport.Formats[0].colorSpace,
+                .imageFormat = surfaceFormat.format,
+                .imageColorSpace = surfaceFormat.colorSpace,
                 .imageExtent = extent,
                 .imageArrayLayers = 1,
                 .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
@@ -387,7 +396,7 @@ namespace Haus {
 
         m_SwapchainImages = m_Device.getSwapchainImagesKHR(m_Swapchain);
 
-        m_SwapchainImageFormat = swapChainSupport.Formats[0].format;
+        m_SwapchainImageFormat = surfaceFormat.format;
         m_SwapchainExtent = extent;
     }
 
