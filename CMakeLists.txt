@@ -44,18 +44,16 @@ foreach (SHADER_PATH ${SHADERS})
     set(OUTPUT_PATH ${CMAKE_BINARY_DIR}/${BUILD_PATH}/shaders/${SHADER_EXTENSION}.spv)
 
     add_custom_command(
-            TARGET ${PROJECT_NAME}
-            PRE_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/${BUILD_PATH}/shaders
-            COMMENT "Creating directory for shaders"
-    )
-
-    add_custom_command(
-            TARGET ${PROJECT_NAME}
-            POST_BUILD
+            OUTPUT ${OUTPUT_PATH}
             COMMAND ${CMAKE_COMMAND} -E echo "Compiling shader: ${SHADER_PATH}"
             COMMAND glslc ${SHADER_PATH} -o ${OUTPUT_PATH}
             DEPENDS ${SHADER_PATH}
+            COMMENT "Compiling shader ${SHADER_PATH}"
     )
+
+    list(APPEND GENERATED_SHADERS ${OUTPUT_PATH})
 endforeach ()
 
+add_custom_target(GenerateShaders DEPENDS ${GENERATED_SHADERS})
+
+add_dependencies(${PROJECT_NAME} GenerateShaders)
