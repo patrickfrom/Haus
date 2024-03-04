@@ -18,5 +18,44 @@ add_subdirectory(vendors/glm)
 add_subdirectory(vendors/stb)
 
 find_package(Vulkan REQUIRED)
-
 target_link_libraries(Haus PRIVATE Vulkan::Vulkan glfw glm::glm stb)
+
+## Include Assets & Shaders ##
+set(BUILD_PATH ${CMAKE_BUILD_TYPE}/${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR})
+set(EXECUTABLE_OUTPUT_PATH ${BUILD_PATH})
+
+set(ASSETS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+add_custom_target(CopyAssets ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${ASSETS_DIR} ${CMAKE_BINARY_DIR}/${BUILD_PATH}/assets
+        DEPENDS ${ASSETS_DIR}
+)
+
+add_dependencies(Haus CopyAssets)
+message("-- Assets " ${ASSETS_DIR})
+
+file(GLOB SHADERS ${CMAKE_CURRENT_SOURCE_DIR}/shaders/*)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/${BUILD_PATH}/shaders)
+message("-- Shaders "  ${CMAKE_BINARY_DIR}/${BUILD_PATH}/shaders)
+
+foreach (SHADER_PATH ${SHADERS})
+    get_filename_component(SHADER_EXT ${SHADER_PATH} EXT)
+    string(SUBSTRING ${SHADER_EXT} 1 -1 SHADER_EXTENSION)
+
+    set(OUTPUT_PATH ${CMAKE_BINARY_DIR}/${BUILD_PATH}/shaders/${SHADER_EXTENSION}.spv)
+
+    add_custom_command(
+            TARGET ${PROJECT_NAME}
+            PRE_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/${BUILD_PATH}/shaders
+            COMMENT "Creating directory for shaders"
+    )
+
+    add_custom_command(
+            TARGET ${PROJECT_NAME}
+            POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E echo "Compiling shader: ${SHADER_PATH}"
+            COMMAND glslc ${SHADER_PATH} -o ${OUTPUT_PATH}
+            DEPENDS ${SHADER_PATH}
+    )
+endforeach ()
+

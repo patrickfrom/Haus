@@ -188,7 +188,7 @@ namespace Haus {
     }
 
     void Application::LoadModel() {
-        std::string modelFile = "models/Moon/Moon 2K.obj";
+        std::string modelFile = "assets/models/Moon/Moon 2K.obj";
         tinyobj::ObjReader reader;
 
         tinyobj::ObjReaderConfig config{};
@@ -371,7 +371,7 @@ namespace Haus {
 
         m_MinImageCount = imageCount;
 
-        vk::SurfaceFormatKHR surfaceFormat = swapChainSupport.Formats[0];
+        vk::SurfaceFormatKHR surfaceFormat = swapChainSupport.Formats[1];
         for (auto format: swapChainSupport.Formats) {
             if (format.format == vk::Format::eB8G8R8A8Srgb && format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
                 surfaceFormat = format;
@@ -590,8 +590,8 @@ namespace Haus {
     }
 
     void Application::CreateGraphicsPipeline() {
-        auto vertexShaderCode = ReadFile("vert.spv");
-        auto fragmentShaderCode = ReadFile("frag.spv");
+        auto vertexShaderCode = ReadFile("shaders/vert.spv");
+        auto fragmentShaderCode = ReadFile("shaders/frag.spv");
 
         vk::ShaderModule vertexShaderModule = CreateShaderModule(vertexShaderCode);
         vk::ShaderModule fragmentShaderModule = CreateShaderModule(fragmentShaderCode);
@@ -896,7 +896,7 @@ namespace Haus {
     void Application::CreateTextureImage() {
         stbi_set_flip_vertically_on_load(true);
         int width, height, channels;
-        stbi_uc *pixels = stbi_load("models/Moon/Textures/Diffuse_2K.png", &width, &height, &channels, STBI_rgb_alpha);
+        stbi_uc *pixels = stbi_load("assets/models/Moon/Textures/Diffuse_2K.png", &width, &height, &channels, STBI_rgb_alpha);
         m_MipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
         vk::DeviceSize imageSize = width * height * 4;
 
@@ -1469,7 +1469,7 @@ namespace Haus {
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
         glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) *
-                          glm::rotate(glm::mat4(1.0f), glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f))
+                          glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f))
                           * glm::scale(glm::mat4(1.0f), glm::vec3(0.5f, 0.5f, 0.5f));
         UniformBufferObject uniformBufferObject{
                 .model = model,
