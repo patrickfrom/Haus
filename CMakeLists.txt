@@ -55,5 +55,4 @@ foreach (SHADER_PATH ${SHADERS})
 endforeach ()
 
 add_custom_target(GenerateShaders DEPENDS ${GENERATED_SHADERS})
-
 add_dependencies(${PROJECT_NAME} GenerateShaders)

@@ -20,7 +20,7 @@ void main() {
 
     // Specular Shading
     vec3 halfwayDirection = normalize(lightDirection + viewDirection);
-    float spec = pow(max(dot(normal, halfwayDirection), 0.0), 8.0);
+    float spec = pow(max(dot(normal, halfwayDirection), 0.0), 2.0);
 
     vec4 ambient = vec4(0.025, 0.025, 0.025, 1.0) * texture(textureSampler, textureCoord);
     vec4 diffuse = vec4(1.0, 1.0, 1.0, 1.0) * diff * texture(textureSampler, textureCoord);

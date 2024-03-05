@@ -25,7 +25,9 @@ namespace Haus {
         glm::mat3 normalInverse;
     };
 
-
+    struct MyConstant {
+        glm::vec3 Position;
+    };
     /*const std::vector<Vertex> vertices = {
             // Front face
             {{0.5f,  0.5f,  0.5f},  {1.0f, 0.0f,  0.0f},  {1.0f, 1.0f}, {0.0f,  0.0f,  1.0f}}, // 0
@@ -678,9 +680,16 @@ namespace Haus {
                 .pAttachments = &colorBlendAttachment
         };
 
+        vk::PushConstantRange pushConstantRange{};
+        pushConstantRange.stageFlags = vk::ShaderStageFlagBits::eVertex;
+        pushConstantRange.offset = 0;
+        pushConstantRange.size = sizeof(MyConstant);
+
         vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
                 .setLayoutCount = 1,
-                .pSetLayouts = &m_DescriptorSetLayout
+                .pSetLayouts = &m_DescriptorSetLayout,
+                .pushConstantRangeCount = 1,
+                .pPushConstantRanges = &pushConstantRange
         };
 
         vk::PipelineDepthStencilStateCreateInfo depthStencil{
@@ -1340,6 +1349,8 @@ namespace Haus {
         }
     }
 
+
+
     void Application::RecordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex) {
         vk::CommandBufferBeginInfo beginInfo{};
 
@@ -1398,7 +1409,20 @@ namespace Haus {
 
         commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_PipelineLayout, 0, 1,
                                          &m_DescriptorSets[m_CurrentFrame], 0, nullptr);
-        commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
+        MyConstant constants[] = {
+                {glm::vec3(-0.7f, 0.0f, 0.0f)},
+                {glm::vec3(0.7f, 0.0f, 0.0f)},
+        };
+
+        for(auto & constant : constants) {
+            commandBuffer.pushConstants(m_PipelineLayout,
+                                        vk::ShaderStageFlagBits::eVertex,
+                                        0,
+                                        sizeof(MyConstant),
+                                        &constant);
+            commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+        }
 
         commandBuffer.endRenderPass();
         commandBuffer.end();
@@ -1470,7 +1494,7 @@ namespace Haus {
 
         glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) *
                           glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f))
-                          * glm::scale(glm::mat4(1.0f), glm::vec3(0.5f, 0.5f, 0.5f));
+                          * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f, 0.3f, 0.3f));
         UniformBufferObject uniformBufferObject{
                 .model = model,
                 .view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f),
