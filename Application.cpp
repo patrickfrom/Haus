@@ -150,6 +150,35 @@ namespace Haus {
         auto app = reinterpret_cast<Application *>(glfwGetWindowUserPointer(window));
         if (key == GLFW_KEY_E && action == GLFW_RELEASE)
             app->m_WireframeEnabled = !app->m_WireframeEnabled;
+
+        if (key == GLFW_KEY_U && action == GLFW_RELEASE) {
+            app->m_Device.waitIdle();
+            app->m_MsaaSamples = app->m_MsaaSamples == vk::SampleCountFlagBits::e2 ? app->GetMaxUsableSampleCount()
+                                                                                   : vk::SampleCountFlagBits::e2;
+
+            app->m_Device.destroyRenderPass(app->m_RenderPass);
+            app->CreateRenderPass();
+
+            app->m_Device.destroyImageView(app->m_ColorImageView);
+            app->m_Device.destroyImage(app->m_ColorImage);
+            app->m_Device.freeMemory(app->m_ColorImageMemory);
+
+            app->m_Device.destroyImageView(app->m_DepthImageView);
+            app->m_Device.destroyImage(app->m_DepthImage);
+            app->m_Device.freeMemory(app->m_DepthImageMemory);
+
+            app->m_Device.destroyPipeline(app->m_GraphicsPipeline);
+            app->m_Device.destroyPipeline(app->m_WireframePipeline);
+            app->m_Device.destroyPipelineLayout(app->m_PipelineLayout);
+            app->CreateGraphicsPipeline();
+
+            for (auto framebuffer: app->m_SwapchainFramebuffers)
+                app->m_Device.destroyFramebuffer(framebuffer);
+
+            app->CreateColorResources();
+            app->CreateDepthResources();
+            app->CreateFramebuffers();
+        }
     }
 
     void Application::CleanupGLFW() {
@@ -905,7 +934,8 @@ namespace Haus {
     void Application::CreateTextureImage() {
         stbi_set_flip_vertically_on_load(true);
         int width, height, channels;
-        stbi_uc *pixels = stbi_load("assets/models/Moon/Textures/Diffuse_2K.png", &width, &height, &channels, STBI_rgb_alpha);
+        stbi_uc *pixels = stbi_load("assets/models/Moon/Textures/Diffuse_2K.png", &width, &height, &channels,
+                                    STBI_rgb_alpha);
         m_MipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
         vk::DeviceSize imageSize = width * height * 4;
 
@@ -1350,7 +1380,6 @@ namespace Haus {
     }
 
 
-
     void Application::RecordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex) {
         vk::CommandBufferBeginInfo beginInfo{};
 
@@ -1415,7 +1444,7 @@ namespace Haus {
                 {glm::vec3(0.7f, 0.0f, 0.0f)},
         };
 
-        for(auto & constant : constants) {
+        for (auto &constant: constants) {
             commandBuffer.pushConstants(m_PipelineLayout,
                                         vk::ShaderStageFlagBits::eVertex,
                                         0,
@@ -1493,7 +1522,7 @@ namespace Haus {
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
         glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) *
-                          glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f))
+                          glm::rotate(glm::mat4(1.0f), time * glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f))
                           * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f, 0.3f, 0.3f));
         UniformBufferObject uniformBufferObject{
                 .model = model,
