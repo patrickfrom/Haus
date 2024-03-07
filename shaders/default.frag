@@ -7,7 +7,7 @@ layout (location = 3) in vec3 fragPos;
 
 layout (location = 0) out vec4 FragColor;
 
-layout (binding = 1) uniform sampler2D textureSampler;
+layout (set = 0, binding = 1) uniform sampler2D textureSampler;
 
 void main() {
     vec3 norm = normalize(normal);

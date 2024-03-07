@@ -155,12 +155,18 @@ namespace Haus {
         // Works and sometimes not, so that means I am doing something wrong Yeee!!
         // TODO: Either try to fix this or leave it for now.
         if (key == GLFW_KEY_U && action == GLFW_RELEASE) {
-            app->m_Device.waitIdle();
-            app->m_MsaaSamples = app->m_MsaaSamples == vk::SampleCountFlagBits::e2 ? app->GetMaxUsableSampleCount()
-                                                                                   : vk::SampleCountFlagBits::e2;
+            app->m_MsaaSamples = app->m_MsaaSamples == vk::SampleCountFlagBits::e1 ? app->GetMaxUsableSampleCount()
+                                                                                   : vk::SampleCountFlagBits::e1;
 
-            app->m_Device.destroyRenderPass(app->m_RenderPass);
+            /*app->m_Device.destroyRenderPass(app->m_RenderPass);
             app->CreateRenderPass();
+
+            app->m_Device.destroyPipeline(app->m_GraphicsPipeline);
+            app->m_Device.destroyPipeline(app->m_WireframePipeline);
+            app->m_Device.destroyPipelineLayout(app->m_PipelineLayout);
+            app->CreateGraphicsPipeline();*/
+
+            app->m_Device.waitIdle();
 
             app->m_Device.destroyImageView(app->m_ColorImageView);
             app->m_Device.destroyImage(app->m_ColorImage);
@@ -170,10 +176,6 @@ namespace Haus {
             app->m_Device.destroyImage(app->m_DepthImage);
             app->m_Device.freeMemory(app->m_DepthImageMemory);
 
-            app->m_Device.destroyPipeline(app->m_GraphicsPipeline);
-            app->m_Device.destroyPipeline(app->m_WireframePipeline);
-            app->m_Device.destroyPipelineLayout(app->m_PipelineLayout);
-            app->CreateGraphicsPipeline();
 
             for (auto framebuffer: app->m_SwapchainFramebuffers)
                 app->m_Device.destroyFramebuffer(framebuffer);
@@ -192,6 +194,15 @@ namespace Haus {
 #pragma endregion GLFW
 
 #pragma region VULKAN
+    const std::vector<const char*> VALIDATION_LAYERS = {
+            "VK_LAYER_KHRONOS_validation"
+    };
+
+#ifdef NDEBUG
+    const bool ENABLE_VALIDATION_LAYERS = false;
+#else
+    const bool ENABLE_VALIDATION_LAYERS = true;
+#endif
 
     void Application::InitVulkan() {
         std::cout << "Initializing Vulkan" << "\n";
@@ -278,7 +289,30 @@ namespace Haus {
         }
     }
 
+    bool CheckValidationLayerSupport() {
+        auto availableLayers = vk::enumerateInstanceLayerProperties();
+        for (const char* layerName : VALIDATION_LAYERS) {
+            bool layerFound = false;
+
+            for (const auto& layerProperties : availableLayers) {
+                if (strcmp(layerName, layerProperties.layerName) == 0) {
+                    layerFound = true;
+                    break;
+                }
+            }
+
+            if (!layerFound)
+                return false;
+        }
+
+        return true;
+    }
+
     void Application::CreateInstance() {
+        if (ENABLE_VALIDATION_LAYERS && !CheckValidationLayerSupport) {
+            throw std::runtime_error("validation layers requested, but not available!");
+        }
+
         vk::ApplicationInfo appInfo{
                 .pApplicationName = m_Specification.Name.c_str(),
                 .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
@@ -297,6 +331,13 @@ namespace Haus {
                 .enabledExtensionCount = glfwExtensionCount,
                 .ppEnabledExtensionNames = extensions
         };
+
+        if (ENABLE_VALIDATION_LAYERS) {
+            createInfo.enabledLayerCount = static_cast<uint32_t>(VALIDATION_LAYERS.size());
+            createInfo.ppEnabledLayerNames = VALIDATION_LAYERS.data();
+        } else {
+            createInfo.enabledLayerCount = 0;
+        }
 
         vk::Result result = vk::createInstance(&createInfo, nullptr, &m_Instance);
         if (result != vk::Result::eSuccess)
@@ -363,6 +404,13 @@ namespace Haus {
                 .pEnabledFeatures = &deviceFeatures,
         };
 
+        if (ENABLE_VALIDATION_LAYERS) {
+            createInfo.enabledLayerCount = static_cast<uint32_t>(VALIDATION_LAYERS.size());
+            createInfo.ppEnabledLayerNames = VALIDATION_LAYERS.data();
+        } else {
+            createInfo.enabledLayerCount = 0;
+        }
+
         m_Device = m_PhysicalDevice.createDevice(createInfo);
         if (!m_Device)
             throw std::runtime_error("Failed to create logical device");
@@ -398,6 +446,7 @@ namespace Haus {
             extent.height = std::clamp(extent.height, swapChainSupport.Capabilities.minImageExtent.height,
                                        swapChainSupport.Capabilities.maxImageExtent.height);
         }
+
 
         uint32_t imageCount = swapChainSupport.Capabilities.minImageCount + 1;
         if (swapChainSupport.Capabilities.maxImageCount > 0 && imageCount > swapChainSupport.Capabilities.maxImageCount)
@@ -1369,7 +1418,7 @@ namespace Haus {
 
         vk::SemaphoreCreateInfo semaphoreInfo{};
         vk::FenceCreateInfo fenceInfo{
-                .flags = vk::FenceCreateFlagBits::eSignaled
+                .flags = vk::FenceCreateFlagBits::eSignaled,
         };
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
