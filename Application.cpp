@@ -1491,7 +1491,6 @@ namespace Haus {
         m_Device.waitForFences(1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
 
         if (m_MsaaChanged[m_CurrentFrame]) {
-            std::cout << "Requested MSAA is " << to_string(m_RequestedMsaaSample) << std::endl;
             std::cout << "Changed MSAA to " << to_string(m_MsaaSamples) << std::endl;
 
             for (auto framebuffer: m_SwapchainFramebuffers)
