@@ -155,34 +155,10 @@ namespace Haus {
         // Works and sometimes not, so that means I am doing something wrong Yeee!!
         // TODO: Either try to fix this or leave it for now.
         if (key == GLFW_KEY_U && action == GLFW_RELEASE) {
-            app->m_MsaaSamples = app->m_MsaaSamples == vk::SampleCountFlagBits::e1 ? app->GetMaxUsableSampleCount()
-                                                                                   : vk::SampleCountFlagBits::e1;
-
-            /*app->m_Device.destroyRenderPass(app->m_RenderPass);
-            app->CreateRenderPass();
-
-            app->m_Device.destroyPipeline(app->m_GraphicsPipeline);
-            app->m_Device.destroyPipeline(app->m_WireframePipeline);
-            app->m_Device.destroyPipelineLayout(app->m_PipelineLayout);
-            app->CreateGraphicsPipeline();*/
-
-            app->m_Device.waitIdle();
-
-            app->m_Device.destroyImageView(app->m_ColorImageView);
-            app->m_Device.destroyImage(app->m_ColorImage);
-            app->m_Device.freeMemory(app->m_ColorImageMemory);
-
-            app->m_Device.destroyImageView(app->m_DepthImageView);
-            app->m_Device.destroyImage(app->m_DepthImage);
-            app->m_Device.freeMemory(app->m_DepthImageMemory);
-
-
-            for (auto framebuffer: app->m_SwapchainFramebuffers)
-                app->m_Device.destroyFramebuffer(framebuffer);
-
-            app->CreateColorResources();
-            app->CreateDepthResources();
-            app->CreateFramebuffers();
+            app->m_MsaaSamples = app->m_MsaaSamples == vk::SampleCountFlagBits::e1 ? app->GetMaxUsableSampleCount() : vk::SampleCountFlagBits::e1;
+            for (auto value : app->m_MsaaChanged) {
+                value = true;
+            }
         }
     }
 
@@ -1415,6 +1391,7 @@ namespace Haus {
         m_ImageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         m_RenderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         m_InFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+        m_MsaaChanged.resize(MAX_FRAMES_IN_FLIGHT);
 
         vk::SemaphoreCreateInfo semaphoreInfo{};
         vk::FenceCreateInfo fenceInfo{
@@ -1510,7 +1487,30 @@ namespace Haus {
     }
 
     void Application::DrawFrame() {
+
         m_Device.waitForFences(1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
+
+        if (m_MsaaChanged[m_CurrentFrame]) {
+            std::cout << "Requested MSAA is " << to_string(m_RequestedMsaaSample) << std::endl;
+            std::cout << "Changed MSAA to " << to_string(m_MsaaSamples) << std::endl;
+
+            for (auto framebuffer: m_SwapchainFramebuffers)
+                m_Device.destroyFramebuffer(framebuffer);
+
+            m_Device.destroyImageView(m_ColorImageView);
+            m_Device.destroyImage(m_ColorImage);
+            m_Device.freeMemory(m_ColorImageMemory);
+
+
+            m_Device.destroyImageView(m_DepthImageView);
+            m_Device.destroyImage(m_DepthImage);
+            m_Device.freeMemory(m_DepthImageMemory);
+
+            CreateColorResources();
+            CreateDepthResources();
+            CreateFramebuffers();
+            m_MsaaChanged[m_CurrentFrame] = false;
+        }
 
         uint32_t imageIndex;
         vk::Result result = m_Device.acquireNextImageKHR(m_Swapchain, UINT64_MAX,
@@ -1526,6 +1526,7 @@ namespace Haus {
         UpdateUniformBuffer(m_CurrentFrame);
 
         m_Device.resetFences(1, &m_InFlightFences[m_CurrentFrame]);
+
 
         m_CommandBuffers[m_CurrentFrame].reset();
         RecordCommandBuffer(m_CommandBuffers[m_CurrentFrame], imageIndex);

@@ -123,6 +123,7 @@ namespace Haus {
         }
 
     private:
+        std::vector<bool> m_MsaaChanged;
         const int MAX_FRAMES_IN_FLIGHT = 2;
         uint32_t m_CurrentFrame = 0;
 
@@ -254,6 +255,7 @@ namespace Haus {
         std::vector<vk::Semaphore> m_ImageAvailableSemaphores;
         std::vector<vk::Semaphore> m_RenderFinishedSemaphores;
         std::vector<vk::Fence> m_InFlightFences;
+
 
         std::vector<Vertex> vertices;
         std::vector<uint32_t> indices;
