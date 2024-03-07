@@ -151,6 +151,9 @@ namespace Haus {
         if (key == GLFW_KEY_E && action == GLFW_RELEASE)
             app->m_WireframeEnabled = !app->m_WireframeEnabled;
 
+
+        // Works and sometimes not, so that means I am doing something wrong Yeee!!
+        // TODO: Either try to fix this or leave it for now.
         if (key == GLFW_KEY_U && action == GLFW_RELEASE) {
             app->m_Device.waitIdle();
             app->m_MsaaSamples = app->m_MsaaSamples == vk::SampleCountFlagBits::e2 ? app->GetMaxUsableSampleCount()
