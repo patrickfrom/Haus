@@ -1489,26 +1489,33 @@ namespace Haus {
     void Application::DrawFrame() {
         m_Device.waitForFences(1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
 
-
-        // Current Problem VUID-vkDestroyFramebuffer-framebuffer-00892(ERROR / SPEC): msgNum: -617577710 - Validation Error: [ VUID-vkDestroyFramebuffer-framebuffer-00892 ] | MessageID = 0xdb308312 | vkDestroyFramebuffer():  can't be called on VkFramebuffer 0xcb1c7c000000001b[] that is currently in use by VkCommandBuffer 0x59f6423d5300[]. The Vulkan spec states: All submitted commands that refer to framebuffer must have completed execution (https://www.khronos.org/registry/vulkan/specs/1.3-extensions/html/vkspec.html#VUID-vkDestroyFramebuffer-framebuffer-00892)
+        // Take a break from this, since it works and sometimes not and I have no idea what to do now so time to do some other stuff in Vulkan :)
         if (m_MsaaChanged[m_CurrentFrame]) {
             std::cout << "Changed MSAA to " << to_string(m_MsaaSamples) << "\n";
+            m_GraphicsQueue.waitIdle();
+            m_Device.destroyRenderPass(m_RenderPass);
+            CreateRenderPass();
 
-            for (auto framebuffer: m_SwapchainFramebuffers)
-                m_Device.destroyFramebuffer(framebuffer);
+            m_Device.destroyPipelineLayout(m_PipelineLayout);
+            m_Device.destroyPipeline(m_GraphicsPipeline);
+            m_Device.destroyPipeline(m_WireframePipeline);
+            CreateGraphicsPipeline();
 
             m_Device.destroyImageView(m_ColorImageView);
             m_Device.destroyImage(m_ColorImage);
             m_Device.freeMemory(m_ColorImageMemory);
 
-
             m_Device.destroyImageView(m_DepthImageView);
             m_Device.destroyImage(m_DepthImage);
             m_Device.freeMemory(m_DepthImageMemory);
 
+            for (auto framebuffer: m_SwapchainFramebuffers)
+                m_Device.destroyFramebuffer(framebuffer);
+
             CreateColorResources();
             CreateDepthResources();
             CreateFramebuffers();
+
             m_MsaaChanged[m_CurrentFrame] = false;
         }
 
