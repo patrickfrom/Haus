@@ -1,12 +1,18 @@
-//
-// Created by bauhaus on 08-03-24.
-//
-
 #include "Application.h"
 #include <iostream>
 
 namespace HausEngine {
-    void Hello() {
-        std::cout << "Hello From Haus Engine" << "\n";
+    Application::Application() {
+        m_Window = Window::Create();
+    }
+
+    Application::~Application() {
+        std::cout << "Destructed Application" << "\n";
+    };
+
+    void Application::Run() {
+        while (!glfwWindowShouldClose(m_Window->GetNativeWindow())) {
+            m_Window->PollEvents();
+        }
     }
 } // HausEngine

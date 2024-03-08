@@ -1,17 +1,18 @@
-//
-// Created by bauhaus on 08-03-24.
-//
+#pragma once
 
-#ifndef HAUS_APPLICATION_H
-#define HAUS_APPLICATION_H
+#include "Window.h"
+#include <GLFW/glfw3.h>
+#include <memory>
 
 namespace HausEngine {
-    void Hello();
-
     class Application {
+    public:
+        Application();
+        ~Application();
 
+        void Run();
+    private:
+        std::unique_ptr<Window> m_Window;
     };
 
 } // HausEngine
-
-#endif //HAUS_APPLICATION_H

@@ -8,7 +8,8 @@ add_library(HausEngine
         Core/Application.h
         HausEngine.h
         vendors/stb/image.h
-        vendors/tiny_obj_loader.h)
+        vendors/tiny_obj_loader.h
+        Core/Window.cpp)
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
