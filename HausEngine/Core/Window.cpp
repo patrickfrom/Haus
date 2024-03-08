@@ -22,6 +22,7 @@ namespace HausEngine {
     }
 
     void Window::Shutdown() {
+        m_RendererContext->GetDevice()->Destroy();
         glfwTerminate();
     }
 

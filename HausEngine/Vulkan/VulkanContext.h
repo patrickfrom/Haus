@@ -11,6 +11,10 @@ namespace HausEngine {
         VulkanContext();
         ~VulkanContext();
 
+        std::shared_ptr<VulkanDevice>& GetDevice() {
+            return m_VulkanDevice;
+        }
+
         static vk::Instance GetInstance() {
             return s_VulkanInstance;
         }
@@ -20,6 +24,7 @@ namespace HausEngine {
         inline static vk::Instance s_VulkanInstance;
 
         std::shared_ptr<VulkanPhysicalDevice> m_VulkanPhysicalDevice;
+        std::shared_ptr<VulkanDevice> m_VulkanDevice;
     };
 
 } // HausEngine

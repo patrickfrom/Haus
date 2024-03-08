@@ -1,6 +1,6 @@
 #include "VulkanContext.h"
 #include <iostream>
-#include <vector>
+#include <GLFW/glfw3.h>
 
 namespace HausEngine {
     VulkanContext::VulkanContext() {
@@ -9,17 +9,21 @@ namespace HausEngine {
         appInfo.pEngineName = "HausEngine";
         appInfo.apiVersion = VK_API_VERSION_1_3;
 
+        uint32_t extensionCount;
+        const char** enabledExtensions = glfwGetRequiredInstanceExtensions(&extensionCount);
         vk::InstanceCreateInfo createInfo{};
         createInfo.pApplicationInfo = &appInfo;
+        createInfo.enabledExtensionCount = extensionCount;
+        createInfo.ppEnabledExtensionNames = enabledExtensions;
 
         if (vk::createInstance(&createInfo, nullptr, &s_VulkanInstance) != vk::Result::eSuccess)
             throw std::runtime_error("Failed to create Vulkan Instance");
 
 
-        // Pick Physical Device & Queues
         m_VulkanPhysicalDevice = VulkanPhysicalDevice::Select();
 
-        // Create Logical Device & Queues
+        vk::PhysicalDeviceFeatures features{};
+        m_VulkanDevice = VulkanDevice::Create(m_VulkanPhysicalDevice, features);
     }
 
     VulkanContext::~VulkanContext() {

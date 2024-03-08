@@ -9,7 +9,7 @@ add_subdirectory(HausEngine)
 
 target_include_directories(Haus PUBLIC HausEngine)
 
-target_link_libraries(Haus PRIVATE HausEngine)
+target_link_libraries(Haus PUBLIC HausEngine)
 
 ## Include Assets & Shaders ##
 set(BUILD_PATH ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR})

@@ -17,6 +17,14 @@ namespace HausEngine {
     public:
         VulkanPhysicalDevice();
 
+        vk::PhysicalDevice GetPhysicalDevice() {
+            return m_PhysicalDevice;
+        }
+
+        QueueFamilyIndices GetQueueFamilyIndices() {
+            return m_QueueFamilyIndices;
+        }
+
         static std::shared_ptr<VulkanPhysicalDevice> Select();
     private:
         vk::PhysicalDevice m_PhysicalDevice;
@@ -27,7 +35,31 @@ namespace HausEngine {
     };
 
     class VulkanDevice {
+    public:
+        VulkanDevice(const std::shared_ptr<VulkanPhysicalDevice>& physicalDevice, vk::PhysicalDeviceFeatures enabledFeatures);
 
+        void Destroy();
+
+        vk::Queue GetGraphicsQueue() {
+            return m_GraphicsQueue;
+        }
+
+        [[nodiscard]] const std::shared_ptr<VulkanPhysicalDevice>& GetPhysicalDevice() const {
+            return m_PhysicalDevice;
+        }
+
+        [[nodiscard]] vk::Device GetDevice() const {
+            return m_LogicalDevice;
+        }
+
+        static std::shared_ptr<VulkanDevice> Create(const std::shared_ptr<VulkanPhysicalDevice>& physicalDevice, vk::PhysicalDeviceFeatures enabledFeatures);
+    private:
+        vk::Device m_LogicalDevice;
+
+        std::shared_ptr<VulkanPhysicalDevice> m_PhysicalDevice;
+        vk::PhysicalDeviceFeatures m_EnabledFeatures;
+
+        vk::Queue m_GraphicsQueue;
     };
 
 } // HausEngine
