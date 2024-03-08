@@ -7,7 +7,10 @@ add_executable(Haus main.cpp
         Application.cpp
         Application.h
         vendors/stb/image.h
-        vendors/tiny_obj_loader.h)
+        vendors/tiny_obj_loader.h
+        Vulkan/VulkanContext.cpp
+        Vulkan/VulkanDevice.h
+        Vulkan/VulkanDevice.cpp)
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -18,7 +21,7 @@ add_subdirectory(vendors/glm)
 add_subdirectory(vendors/stb)
 
 find_package(Vulkan REQUIRED)
-target_link_libraries(Haus PRIVATE Vulkan::Vulkan glfw glm::glm stb -static)
+target_link_libraries(Haus PRIVATE Vulkan::Vulkan glfw glm::glm stb)
 
 ## Include Assets & Shaders ##
 set(BUILD_PATH ${CMAKE_BUILD_TYPE}/${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR})

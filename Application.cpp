@@ -170,21 +170,13 @@ namespace Haus {
 #pragma endregion GLFW
 
 #pragma region VULKAN
-    const std::vector<const char*> VALIDATION_LAYERS = {
-            "VK_LAYER_KHRONOS_validation"
-    };
-
-#ifdef NDEBUG
-    const bool ENABLE_VALIDATION_LAYERS = false;
-#else
-    const bool ENABLE_VALIDATION_LAYERS = true;
-#endif
-
     void Application::InitVulkan() {
         std::cout << "Initializing Vulkan" << "\n";
-        CreateInstance();
+        m_VulkanContext = new VulkanContext();
+        m_MsaaSamples = GetMaxUsableSampleCount();
+        std::cout << "MSAA: " << to_string(m_MsaaSamples) << std::endl;
+
         CreateSurface();
-        PickPhysicalDevice();
         CreateLogicalDevice();
         CreateSwapchain();
         CreateImageViews();
@@ -265,93 +257,9 @@ namespace Haus {
         }
     }
 
-    bool CheckValidationLayerSupport() {
-        auto availableLayers = vk::enumerateInstanceLayerProperties();
-        for (const char* layerName : VALIDATION_LAYERS) {
-            bool layerFound = false;
-
-            for (const auto& layerProperties : availableLayers) {
-                if (strcmp(layerName, layerProperties.layerName) == 0) {
-                    layerFound = true;
-                    break;
-                }
-            }
-
-            if (!layerFound)
-                return false;
-        }
-
-        return true;
-    }
-
-    void Application::CreateInstance() {
-        if (ENABLE_VALIDATION_LAYERS && !CheckValidationLayerSupport) {
-            throw std::runtime_error("validation layers requested, but not available!");
-        }
-
-        vk::ApplicationInfo appInfo{
-                .pApplicationName = m_Specification.Name.c_str(),
-                .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-
-                .pEngineName = "No Engine",
-                .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-
-                .apiVersion = VK_API_VERSION_1_3
-        };
-
-        uint32_t glfwExtensionCount = 0;
-        const char **extensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-        vk::InstanceCreateInfo createInfo{
-                .pApplicationInfo = &appInfo,
-                .enabledExtensionCount = glfwExtensionCount,
-                .ppEnabledExtensionNames = extensions
-        };
-
-        if (ENABLE_VALIDATION_LAYERS) {
-            createInfo.enabledLayerCount = static_cast<uint32_t>(VALIDATION_LAYERS.size());
-            createInfo.ppEnabledLayerNames = VALIDATION_LAYERS.data();
-        } else {
-            createInfo.enabledLayerCount = 0;
-        }
-
-        vk::Result result = vk::createInstance(&createInfo, nullptr, &m_Instance);
-        if (result != vk::Result::eSuccess)
-            throw std::runtime_error("Failed to create Instance");
-    }
-
     void Application::CreateSurface() {
-        if (glfwCreateWindowSurface(m_Instance, m_Window, nullptr, reinterpret_cast<VkSurfaceKHR *>(&m_Surface)))
+        if (glfwCreateWindowSurface(VulkanContext::GetInstance(), m_Window, nullptr, reinterpret_cast<VkSurfaceKHR *>(&m_Surface)))
             throw std::runtime_error("Failed to create window surface!");
-    }
-
-    bool IsDeviceSuitable(vk::PhysicalDevice device) {
-        vk::PhysicalDeviceProperties deviceProperties = device.getProperties();
-        vk::PhysicalDeviceFeatures deviceFeatures = device.getFeatures();
-        return deviceFeatures.geometryShader && deviceFeatures.fillModeNonSolid && deviceFeatures.samplerAnisotropy;
-    }
-
-    void Application::PickPhysicalDevice() {
-
-        std::vector<vk::PhysicalDevice> devices = m_Instance.enumeratePhysicalDevices();
-        if (devices.empty())
-            throw std::runtime_error("Failed to find GPUs with vulkan support");
-
-        for (const auto &device: devices) {
-            if (IsDeviceSuitable(device)) {
-                m_PhysicalDevice = device;
-                m_MsaaSamples = GetMaxUsableSampleCount();
-                break;
-            }
-        }
-
-        if (m_PhysicalDevice == VK_NULL_HANDLE)
-            throw std::runtime_error("Failed to find a suitable GPU!");
-
-        vk::PhysicalDeviceProperties deviceProperties = m_PhysicalDevice.getProperties();
-        std::cout << deviceProperties.deviceName << "\n";
-        std::cout << to_string(deviceProperties.deviceType) << "\n";
-        std::cout << "MSAA: " << to_string(m_MsaaSamples) << std::endl;
     }
 
     void Application::CreateLogicalDevice() {
@@ -387,7 +295,7 @@ namespace Haus {
             createInfo.enabledLayerCount = 0;
         }
 
-        m_Device = m_PhysicalDevice.createDevice(createInfo);
+        m_Device = m_VulkanContext->GetVulkanPhysicalDevice()->GetPhysicalDevice().createDevice(createInfo);
         if (!m_Device)
             throw std::runtime_error("Failed to create logical device");
 
@@ -405,7 +313,7 @@ namespace Haus {
     }
 
     void Application::CreateSwapchain() {
-        SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport(m_PhysicalDevice);
+        SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport(m_VulkanContext->GetVulkanPhysicalDevice()->GetPhysicalDevice());
 
         vk::Extent2D extent{};
         if (swapChainSupport.Capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
@@ -1109,7 +1017,7 @@ namespace Haus {
     }
 
     void Application::CreateTextureSampler() {
-        vk::PhysicalDeviceProperties properties = m_PhysicalDevice.getProperties();
+        vk::PhysicalDeviceProperties properties = m_VulkanContext->GetVulkanPhysicalDevice()->GetPhysicalDevice().getProperties();
 
         vk::SamplerCreateInfo samplerInfo{
                 .magFilter = vk::Filter::eLinear,
@@ -1197,7 +1105,7 @@ namespace Haus {
     }
 
     uint32_t Application::FindMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
-        vk::PhysicalDeviceMemoryProperties memoryProperties = m_PhysicalDevice.getMemoryProperties();
+        vk::PhysicalDeviceMemoryProperties memoryProperties = m_VulkanContext->GetVulkanPhysicalDevice()->GetPhysicalDevice().getMemoryProperties();
 
         //TODO Slowly understanding that we are using bitwise to check for example 1101 and 1001 then that will bet set if I am correct, still no idea
         for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
@@ -1636,12 +1544,13 @@ namespace Haus {
         m_Device.destroyRenderPass(m_RenderPass);
 
         m_Device.destroy();
-        m_Instance.destroySurfaceKHR(m_Surface);
-        m_Instance.destroy();
+        VulkanContext::GetInstance().destroySurfaceKHR(m_Surface);
+
+        delete m_VulkanContext;
     }
 
     vk::SampleCountFlagBits Application::GetMaxUsableSampleCount() {
-        vk::PhysicalDeviceProperties physicalDeviceProperties = m_PhysicalDevice.getProperties();
+        vk::PhysicalDeviceProperties physicalDeviceProperties = m_VulkanContext->GetVulkanPhysicalDevice()->GetPhysicalDevice().getProperties();
 
         vk::SampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts &
                                       physicalDeviceProperties.limits.framebufferDepthSampleCounts;

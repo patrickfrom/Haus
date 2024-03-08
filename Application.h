@@ -15,7 +15,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 
 #include <glm/gtx/hash.hpp>
-
+#include "Vulkan/VulkanContext.h"
 struct Vertex {
     glm::vec3 Position;
     glm::vec3 Color;
@@ -174,11 +174,8 @@ namespace Haus {
 
         void InitVulkan();
 
-        void CreateInstance();
-
         void CreateSurface();
 
-        void PickPhysicalDevice();
 
         void CreateLogicalDevice();
 
@@ -229,9 +226,8 @@ namespace Haus {
 
         bool m_WireframeEnabled = false;
 
-        vk::Instance m_Instance;
+        VulkanContext* m_VulkanContext{};
         vk::SurfaceKHR m_Surface;
-        vk::PhysicalDevice m_PhysicalDevice;
         vk::Device m_Device;
 
         vk::SwapchainKHR m_Swapchain;
