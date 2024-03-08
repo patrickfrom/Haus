@@ -3,10 +3,23 @@
 #include "VulkanContext.h"
 
 namespace HausEngine {
-    bool IsDeviceSuitable(vk::PhysicalDevice device) {
+    bool VulkanPhysicalDevice::IsDeviceSuitable(vk::PhysicalDevice device) {
         vk::PhysicalDeviceProperties deviceProperties = device.getProperties();
         vk::PhysicalDeviceFeatures deviceFeatures = device.getFeatures();
-        return deviceFeatures.geometryShader && deviceFeatures.fillModeNonSolid && deviceFeatures.samplerAnisotropy;
+
+        int i = 0;
+        for (auto queueFamily : device.getQueueFamilyProperties()) {
+            if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics) {
+                m_QueueFamilyIndices.Graphics = i;
+            }
+
+            if (m_QueueFamilyIndices.IsComplete())
+                break;
+
+            i++;
+        }
+
+        return m_QueueFamilyIndices.IsComplete();
     }
 
     VulkanPhysicalDevice::VulkanPhysicalDevice() {
@@ -18,7 +31,6 @@ namespace HausEngine {
         for (const auto &device: devices) {
             if (IsDeviceSuitable(device)) {
                 m_PhysicalDevice = device;
-
                 break;
             }
         }
@@ -29,7 +41,6 @@ namespace HausEngine {
         vk::PhysicalDeviceProperties deviceProperties = m_PhysicalDevice.getProperties();
         std::cout << deviceProperties.deviceName << "\n";
         std::cout << to_string(deviceProperties.deviceType) << "\n";
-
     }
 
     std::shared_ptr<VulkanPhysicalDevice> VulkanPhysicalDevice::Select() {
