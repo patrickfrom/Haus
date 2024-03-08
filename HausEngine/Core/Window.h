@@ -1,5 +1,6 @@
 #pragma once
 
+#include "VulkanContext.h"
 #include <GLFW/glfw3.h>
 #include <memory>
 
@@ -22,6 +23,8 @@ namespace HausEngine {
         static std::unique_ptr<Window> Create();
     private:
         GLFWwindow* m_NativeWindow;
+
+        std::shared_ptr<VulkanContext> m_RendererContext;
     };
 
 } // HausEngine

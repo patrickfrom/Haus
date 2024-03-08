@@ -12,6 +12,8 @@ namespace HausEngine {
         m_NativeWindow = glfwCreateWindow(800, 600, "HausEngine", nullptr, nullptr);
         if (!m_NativeWindow)
             throw std::runtime_error("Failed to create GLFW Window");
+
+        m_RendererContext = VulkanContext::Create();
     }
 
     Window::~Window() {

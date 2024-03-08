@@ -9,7 +9,15 @@ add_library(HausEngine
         HausEngine.h
         vendors/stb/image.h
         vendors/tiny_obj_loader.h
-        Core/Window.cpp)
+        Core/Window.cpp
+        Core/Window.h
+        Vulkan/VulkanContext.h
+        Vulkan/VulkanContext.cpp
+        Vulkan/VulkanDevice.h
+        Vulkan/VulkanDevice.cpp)
+
+target_include_directories(HausEngine PUBLIC Vulkan)
+
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
