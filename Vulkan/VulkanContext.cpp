@@ -32,11 +32,9 @@ namespace Haus {
 
     VulkanContext::~VulkanContext() {
         std::cout << "Destructed Vulkan Context" << "\n";
-        delete m_VulkanPhysicalDevice;
 
         s_VulkanInstance.destroy();
         s_VulkanInstance = nullptr;
-
     }
 
     void VulkanContext::Init() {
@@ -72,7 +70,6 @@ namespace Haus {
         if (result != vk::Result::eSuccess)
             throw std::runtime_error("Failed to create Instance");
 
-        m_VulkanPhysicalDevice = new VulkanPhysicalDevice();
-        m_VulkanPhysicalDevice->Select();
+        m_VulkanPhysicalDevice = VulkanPhysicalDevice::Select();
     }
 } // Haus

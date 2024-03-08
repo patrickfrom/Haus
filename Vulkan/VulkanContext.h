@@ -7,6 +7,7 @@
 
 #include <vulkan/vulkan.hpp>
 #include "VulkanDevice.h"
+#include <memory>
 
 namespace Haus {
     const std::vector<const char *> VALIDATION_LAYERS = {
@@ -30,14 +31,14 @@ namespace Haus {
         }
 
         // Just doing this for now until I create the class for Vulkan Logical Device
-        Haus::VulkanPhysicalDevice* GetVulkanPhysicalDevice() {
+        std::shared_ptr<VulkanPhysicalDevice> GetVulkanPhysicalDevice() {
             return m_VulkanPhysicalDevice;
         }
 
     private:
         inline static vk::Instance s_VulkanInstance;
 
-        Haus::VulkanPhysicalDevice* m_VulkanPhysicalDevice{};
+        std::shared_ptr<VulkanPhysicalDevice> m_VulkanPhysicalDevice;
 
         void Init();
     };

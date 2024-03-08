@@ -13,7 +13,7 @@ namespace Haus {
         return deviceFeatures.geometryShader && deviceFeatures.fillModeNonSolid && deviceFeatures.samplerAnisotropy;
     }
 
-    void VulkanPhysicalDevice::Select() {
+    VulkanPhysicalDevice::VulkanPhysicalDevice() {
         auto instance = VulkanContext::GetInstance();
         std::vector<vk::PhysicalDevice> devices = instance.enumeratePhysicalDevices();
         if (devices.empty())
@@ -33,5 +33,10 @@ namespace Haus {
         vk::PhysicalDeviceProperties deviceProperties = m_PhysicalDevice.getProperties();
         std::cout << deviceProperties.deviceName << "\n";
         std::cout << to_string(deviceProperties.deviceType) << "\n";
+
+    }
+
+    std::shared_ptr<VulkanPhysicalDevice> VulkanPhysicalDevice::Select() {
+        return std::make_shared<VulkanPhysicalDevice>();
     }
 } // Haus

@@ -6,16 +6,17 @@
 #define HAUS_VULKANDEVICE_H
 
 #include <vulkan/vulkan.hpp>
+#include <memory>
 
 namespace Haus {
 
     class VulkanPhysicalDevice {
     public:
-        VulkanPhysicalDevice() = default;
+        VulkanPhysicalDevice();
 
         ~VulkanPhysicalDevice() = default;
 
-        void Select();
+        static std::shared_ptr<VulkanPhysicalDevice> Select();
 
         vk::PhysicalDevice GetPhysicalDevice() {
             return m_PhysicalDevice;
