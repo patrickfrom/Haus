@@ -112,7 +112,7 @@ namespace Haus {
     }
 
     void Application::Loop() {
-        while (!glfwWindowShouldClose(m_Window)) {
+        while (!glfwWindowShouldClose(m_Window->GetNativeWindow())) {
             glfwPollEvents();
             DrawFrame();
         }
@@ -125,19 +125,11 @@ namespace Haus {
 #pragma region GLFW
 
     void Application::InitWindow() {
-        if (!glfwInit())
-            throw std::runtime_error("Failed to Initialize GLFW");
+        m_Window = new Window("HAUS");
 
-        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-
-        m_Window = glfwCreateWindow(m_Specification.Width, m_Specification.Height, m_Specification.Name.c_str(),
-                                    nullptr, nullptr);
-        if (!m_Window)
-            throw std::runtime_error("Failed to create GLFW Window");
-
-        glfwSetWindowUserPointer(m_Window, this);
-        glfwSetFramebufferSizeCallback(m_Window, FramebufferResizeCallback);
-        glfwSetKeyCallback(m_Window, KeyCallback);
+        glfwSetWindowUserPointer(m_Window->GetNativeWindow(), this);
+        glfwSetFramebufferSizeCallback(m_Window->GetNativeWindow(), FramebufferResizeCallback);
+        glfwSetKeyCallback(m_Window->GetNativeWindow(), KeyCallback);
     }
 
     void Application::FramebufferResizeCallback(GLFWwindow *window, int width, int height) {
@@ -163,8 +155,7 @@ namespace Haus {
     }
 
     void Application::CleanupGLFW() {
-        glfwDestroyWindow(m_Window);
-        glfwTerminate();
+        delete m_Window;
     }
 
 #pragma endregion GLFW
@@ -258,7 +249,7 @@ namespace Haus {
     }
 
     void Application::CreateSurface() {
-        if (glfwCreateWindowSurface(VulkanContext::GetInstance(), m_Window, nullptr, reinterpret_cast<VkSurfaceKHR *>(&m_Surface)))
+        if (glfwCreateWindowSurface(VulkanContext::GetInstance(), m_Window->GetNativeWindow(), nullptr, reinterpret_cast<VkSurfaceKHR *>(&m_Surface)))
             throw std::runtime_error("Failed to create window surface!");
     }
 
@@ -320,7 +311,7 @@ namespace Haus {
             extent = swapChainSupport.Capabilities.currentExtent;
         } else {
             int width, height;
-            glfwGetFramebufferSize(m_Window, &width, &height);
+            glfwGetFramebufferSize(m_Window->GetNativeWindow(), &width, &height);
 
             extent.width = width;
             extent.height = height;
@@ -390,9 +381,9 @@ namespace Haus {
 
     void Application::RecreateSwapchain() {
         int width = 0, height = 0;
-        glfwGetFramebufferSize(m_Window, &width, &height);
+        glfwGetFramebufferSize(m_Window->GetNativeWindow(), &width, &height);
         while (width == 0 || height == 0) {
-            glfwGetFramebufferSize(m_Window, &width, &height);
+            glfwGetFramebufferSize(m_Window->GetNativeWindow(), &width, &height);
             glfwWaitEvents();
         }
         m_Device.waitIdle();

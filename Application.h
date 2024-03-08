@@ -5,6 +5,7 @@
 #include <vulkan/vulkan.hpp>
 #include <GLFW/glfw3.h>
 #include "glm/vec4.hpp"
+#include "Window.h"
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -115,7 +116,7 @@ namespace Haus {
 
         static void KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
 
-        GLFWwindow *m_Window;
+        Window* m_Window{};
 
     public:
         void SetClearColor(glm::vec4 color) {

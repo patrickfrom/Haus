@@ -10,7 +10,9 @@ add_executable(Haus main.cpp
         vendors/tiny_obj_loader.h
         Vulkan/VulkanContext.cpp
         Vulkan/VulkanDevice.h
-        Vulkan/VulkanDevice.cpp)
+        Vulkan/VulkanDevice.cpp
+        Window.h
+        Window.cpp)
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
