@@ -1,6 +1,6 @@
-[submodule "vendors/GLFW"]
-	path = vendors/GLFW
+[submodule "HausEngine/vendors/GLFW"]
+	path = HausEngine/vendors/GLFW
 	url = https://github.com/glfw/glfw.git
-[submodule "vendors/glm"]
-	path = vendors/glm
+[submodule "HausEngine/vendors/glm"]
+	path = HausEngine/vendors/glm
 	url = https://github.com/g-truc/glm.git

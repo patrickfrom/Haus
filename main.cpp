@@ -1,4 +1,4 @@
-#include <HausEngine/HausEngine.h>
+#include <HausEngine.h>
 
 int main() {
     HausEngine::Hello();

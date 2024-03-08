@@ -3,24 +3,13 @@ project(Haus)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(Haus main.cpp
-        vendors/stb/image.h
-        vendors/tiny_obj_loader.h)
+add_executable(Haus main.cpp)
 
-
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-
-add_subdirectory(vendors/GLFW)
-add_subdirectory(vendors/glm)
-add_subdirectory(vendors/stb)
 add_subdirectory(HausEngine)
 
 target_include_directories(Haus PUBLIC HausEngine)
 
-find_package(Vulkan REQUIRED)
-target_link_libraries(Haus PRIVATE Vulkan::Vulkan glfw glm::glm stb HausEngine)
+target_link_libraries(Haus PRIVATE HausEngine)
 
 ## Include Assets & Shaders ##
 set(BUILD_PATH ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR})

@@ -1,4 +1,7 @@
 cmake-build-debug
 cmake-build-release
 
+HausEngine/cmake-build-debug
+HausEngine/cmake-build-release
+
 .idea
