@@ -14,9 +14,10 @@ add_library(HausEngine
         Vulkan/VulkanContext.h
         Vulkan/VulkanContext.cpp
         Vulkan/VulkanDevice.h
-        Vulkan/VulkanDevice.cpp)
+        Vulkan/VulkanDevice.cpp
+        Core/Ref.h)
 
-target_include_directories(HausEngine PUBLIC Vulkan)
+target_include_directories(HausEngine PUBLIC Vulkan Core)
 
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)

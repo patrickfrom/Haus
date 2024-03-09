@@ -19,12 +19,11 @@ namespace HausEngine {
             return m_NativeWindow;
         }
 
-
         static std::unique_ptr<Window> Create();
     private:
         GLFWwindow* m_NativeWindow;
 
-        std::shared_ptr<VulkanContext> m_RendererContext;
+        Ref<VulkanContext> m_RendererContext;
     };
 
 } // HausEngine

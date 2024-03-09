@@ -48,7 +48,6 @@ namespace HausEngine {
         return std::make_shared<VulkanPhysicalDevice>();
     }
 
-    // Device
     VulkanDevice::VulkanDevice(const std::shared_ptr<VulkanPhysicalDevice> &physicalDevice,
                                vk::PhysicalDeviceFeatures enabledFeatures) : m_PhysicalDevice(physicalDevice),
                                                                              m_EnabledFeatures(enabledFeatures) {
@@ -78,10 +77,5 @@ namespace HausEngine {
     void VulkanDevice::Destroy() {
         m_LogicalDevice.waitIdle();
         m_LogicalDevice.destroy();
-    }
-
-    std::shared_ptr<VulkanDevice> VulkanDevice::Create(const std::shared_ptr<VulkanPhysicalDevice> &physicalDevice,
-                                                       vk::PhysicalDeviceFeatures enabledFeatures) {
-        return std::make_shared<VulkanDevice>(physicalDevice, enabledFeatures);
     }
 } // HausEngine

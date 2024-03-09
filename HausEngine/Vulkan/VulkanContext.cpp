@@ -23,15 +23,11 @@ namespace HausEngine {
         m_VulkanPhysicalDevice = VulkanPhysicalDevice::Select();
 
         vk::PhysicalDeviceFeatures features{};
-        m_VulkanDevice = VulkanDevice::Create(m_VulkanPhysicalDevice, features);
+        m_VulkanDevice = Ref<VulkanDevice>::Create(m_VulkanPhysicalDevice, features);
     }
 
     VulkanContext::~VulkanContext() {
         vkDestroyInstance(s_VulkanInstance, nullptr);
         s_VulkanInstance = nullptr;
-    }
-
-    std::shared_ptr<VulkanContext> VulkanContext::Create() {
-        return std::make_shared<VulkanContext>();
     }
 } // HausEngine

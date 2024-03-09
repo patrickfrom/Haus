@@ -51,8 +51,6 @@ namespace HausEngine {
         [[nodiscard]] vk::Device GetDevice() const {
             return m_LogicalDevice;
         }
-
-        static std::shared_ptr<VulkanDevice> Create(const std::shared_ptr<VulkanPhysicalDevice>& physicalDevice, vk::PhysicalDeviceFeatures enabledFeatures);
     private:
         vk::Device m_LogicalDevice;
 
