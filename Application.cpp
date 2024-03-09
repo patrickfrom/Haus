@@ -147,8 +147,9 @@ namespace Haus {
         // Works and sometimes not, so that means I am doing something wrong Yeee!!
         // TODO: Either try to fix this or leave it for now.
         if (key == GLFW_KEY_U && action == GLFW_RELEASE) {
-            app->m_MsaaSamples = app->m_MsaaSamples == vk::SampleCountFlagBits::e1 ? app->GetMaxUsableSampleCount() : vk::SampleCountFlagBits::e1;
-            for (auto value : app->m_MsaaChanged) {
+            app->m_MsaaSamples = app->m_MsaaSamples == vk::SampleCountFlagBits::e1 ? app->GetMaxUsableSampleCount()
+                                                                                   : vk::SampleCountFlagBits::e1;
+            for (auto value: app->m_MsaaChanged) {
                 value = true;
             }
         }
@@ -161,6 +162,7 @@ namespace Haus {
 #pragma endregion GLFW
 
 #pragma region VULKAN
+
     void Application::InitVulkan() {
         std::cout << "Initializing Vulkan" << "\n";
         m_VulkanContext = new VulkanContext();
@@ -249,7 +251,8 @@ namespace Haus {
     }
 
     void Application::CreateSurface() {
-        if (glfwCreateWindowSurface(VulkanContext::GetInstance(), m_Window->GetNativeWindow(), nullptr, reinterpret_cast<VkSurfaceKHR *>(&m_Surface)))
+        if (glfwCreateWindowSurface(VulkanContext::GetInstance(), m_Window->GetNativeWindow(), nullptr,
+                                    reinterpret_cast<VkSurfaceKHR *>(&m_Surface)))
             throw std::runtime_error("Failed to create window surface!");
     }
 
@@ -304,7 +307,8 @@ namespace Haus {
     }
 
     void Application::CreateSwapchain() {
-        SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport(m_VulkanContext->GetVulkanPhysicalDevice()->GetPhysicalDevice());
+        SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport(
+                m_VulkanContext->GetVulkanPhysicalDevice()->GetPhysicalDevice());
 
         vk::Extent2D extent{};
         if (swapChainSupport.Capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
@@ -702,6 +706,23 @@ namespace Haus {
             throw std::runtime_error("Failed to create Wireframe Pipeline");
     }
 
+    template<std::size_t SIZE>
+    void CreateFramebuffer(std::array<vk::ImageView, SIZE> &attachments, vk::Device device, vk::RenderPass renderPass,
+                           uint32_t width, uint32_t height, vk::Framebuffer &out_framebuffer) {
+        vk::FramebufferCreateInfo framebufferInfo{
+                .renderPass = renderPass,
+                .attachmentCount = static_cast<uint32_t>(attachments.size()),
+                .pAttachments = attachments.data(),
+                .width = width,
+                .height = height,
+                .layers = 1
+        };
+
+        if (device.createFramebuffer(&framebufferInfo, nullptr, &out_framebuffer) !=
+            vk::Result::eSuccess)
+            throw std::runtime_error("Failed to create framebuffer");
+    }
+
     void Application::CreateFramebuffers() {
         m_SwapchainFramebuffers.resize(m_SwapchainImageViews.size());
 
@@ -711,19 +732,8 @@ namespace Haus {
                     m_DepthImageView,
                     m_SwapchainImageViews[i]
             };
-
-            vk::FramebufferCreateInfo framebufferInfo{
-                    .renderPass = m_RenderPass,
-                    .attachmentCount = static_cast<uint32_t>(attachments.size()),
-                    .pAttachments = attachments.data(),
-                    .width = m_SwapchainExtent.width,
-                    .height = m_SwapchainExtent.height,
-                    .layers = 1
-            };
-
-            if (m_Device.createFramebuffer(&framebufferInfo, nullptr, &m_SwapchainFramebuffers[i]) !=
-                vk::Result::eSuccess)
-                throw std::runtime_error("Failed to create framebuffer");
+            CreateFramebuffer(attachments, m_Device, m_RenderPass, m_SwapchainExtent.width, m_SwapchainExtent.height,
+                              m_SwapchainFramebuffers[i]);
         }
     }
 
