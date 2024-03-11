@@ -15,7 +15,9 @@ add_library(HausEngine
         Vulkan/VulkanContext.cpp
         Vulkan/VulkanDevice.h
         Vulkan/VulkanDevice.cpp
-        Core/Ref.h)
+        Core/Ref.h
+        Vulkan/VulkanSwapchain.h
+        Vulkan/VulkanSwapchain.cpp)
 
 target_include_directories(HausEngine PUBLIC Vulkan Core)
 

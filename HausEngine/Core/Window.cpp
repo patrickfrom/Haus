@@ -13,7 +13,13 @@ namespace HausEngine {
         if (!m_NativeWindow)
             throw std::runtime_error("Failed to create GLFW Window");
 
+
         m_RendererContext = Ref<VulkanContext>::Create();
+
+        if (glfwCreateWindowSurface(VulkanContext::GetInstance(), m_NativeWindow, nullptr, reinterpret_cast<VkSurfaceKHR*>(&m_Surface)) != VK_SUCCESS)
+            throw std::runtime_error("Failed to create Vulkan Surface");
+
+        m_Swapchain = Ref<VulkanSwapchain>::Create(m_RendererContext->GetDevice(), m_Surface);
     }
 
     Window::~Window() {
@@ -22,7 +28,9 @@ namespace HausEngine {
     }
 
     void Window::Shutdown() {
+        m_Swapchain->Destroy();
         m_RendererContext->GetDevice()->Destroy();
+        m_RendererContext->GetInstance().destroySurfaceKHR(m_Surface);
         glfwTerminate();
     }
 
